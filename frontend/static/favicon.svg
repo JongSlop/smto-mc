@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" role="img">
+  <!--
+    The Observer block, straight on, drawn on Minecraft's own 16x16 grid.
+
+    Every shape is an axis aligned rectangle on whole pixels, so it stays hard
+    edged at any size, the way the skins and server icons in this app do. The
+    face is the identity: a dark socket, a quartz iris, a dark pupil, which is
+    what makes an observer recognisable across a room. The red pixel in the
+    bottom corner is the lamp on its back, the part that fires when it sees
+    something change.
+
+    Fixed colours rather than theme tokens, on purpose: this is a mark, and a
+    mark that changes colour with the page is two marks.
+  -->
+  <rect width="16" height="16" fill="#4a5057" />
+  <rect width="16" height="2" fill="#6d757d" />
+  <rect width="2" height="16" fill="#6d757d" />
+  <rect y="14" width="16" height="2" fill="#2f3337" />
+  <rect x="14" width="2" height="16" fill="#2f3337" />
+
+  <!-- Stone is never one flat colour. Three pixels of grain, no more. -->
+  <rect x="5" y="1" width="3" height="1" fill="#5d646b" />
+  <rect x="11" y="0" width="2" height="1" fill="#7d858d" />
+  <rect x="1" y="5" width="1" height="4" fill="#5d646b" />
+
+  <rect x="2" y="2" width="12" height="12" fill="#1b1e21" />
+  <rect x="4" y="4" width="8" height="8" fill="#e8eef2" />
+  <rect x="6" y="6" width="4" height="4" fill="#1b1e21" />
+
+  <rect class="lamp" x="12" y="12" width="2" height="2" fill="#d8483b" />
+</svg>

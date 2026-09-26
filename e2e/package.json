@@ -1,0 +1,16 @@
+{
+  "name": "@smto/mc-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test": "echo \"browser tests run via test:e2e\" && exit 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "typescript": "^5.9.3",
+    "@types/node": "^26.4.1"
+  }
+}

@@ -1,0 +1,337 @@
+// Conventions follow the account system's schema: models are PascalCase and
+// mapped to snake_case plural tables, every field is mapped, timestamps are
+// timestamptz(3), and ids are uuid. Anything that has to match across the two
+// services is spelled the same way in both.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 no longer takes the connection URL here. Migrations read it from
+// prisma.config.ts, and the runtime client gets it through the pg driver adapter.
+//
+// The partial unique indexes on minecraft_links are created by hand in the
+// initial migration, since this schema language cannot express them.
+datasource db {
+  provider = "postgresql"
+}
+
+/// How a Minecraft profile was proven to belong to the account holding it.
+enum VerificationMethod {
+  /// Microsoft account, through the same Xbox Live chain the launcher uses.
+  MSA
+  /// A code typed in chat on an online-mode server, so Mojang did the checking.
+  INGAME_CODE
+
+  @@map("verification_method")
+}
+
+/// Matches the launcher's own enum. Adding a value here is a breaking change
+/// for installed launchers, see packages/contracts/src/server.ts.
+enum ServerState {
+  ONGOING
+  ARCHIVED
+  UPCOMING
+
+  @@map("server_state")
+}
+
+/// A person, as far as this service is concerned.
+///
+/// The row is created on first login and keyed by the account system's `sub`.
+/// Everything else on it is a cache of what the ID token last said, refreshed
+/// at every login, and is safe to be stale. The username in particular is
+/// display only: released usernames are handed on after thirty days, so using
+/// one as a key would eventually attribute a stranger's playtime to somebody.
+model Account {
+  id             String    @id @db.Uuid
+  username       String    @map("username_cache")
+  avatarUrl      String?   @map("avatar_url_cache")
+  roles          String[]  @map("roles_cache")
+  lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sessions     Session[]
+  /// Many rows, at most one of them live. Unlinking is a soft delete, so an
+  /// account that links, unlinks and links again has three rows here.
+  links        MinecraftLink[]
+  linkCodes    LinkCode[]
+  auditEntries AuditLog[]
+
+  @@map("accounts")
+}
+
+/// A signed-in browser.
+///
+/// The cookie carries a random token, and only its SHA-256 is stored, for the
+/// same reason API tokens work that way: there is nothing to brute force in 256
+/// random bits, and a database dump does not hand anyone a live session.
+///
+/// The account system's refresh token lives here encrypted rather than hashed,
+/// because unlike the session token we do have to send it back to them.
+model Session {
+  id              String   @id @default(uuid()) @db.Uuid
+  /// SHA-256 of the value in the cookie.
+  tokenHash       String   @unique @map("token_hash")
+  accountId       String   @map("account_id") @db.Uuid
+  /// AES-256-GCM, see SecretCipherService. The account system rotates this on
+  /// every use and treats a replay as a compromise, so the new value has to be
+  /// written back immediately.
+  refreshTokenEnc String   @map("refresh_token_enc")
+  /// When the account system's refresh token itself runs out.
+  expiresAt       DateTime @map("expires_at") @db.Timestamptz(3)
+  /// Last time the roles and profile on the account were re-read from the
+  /// account system. Drives how quickly a demotion or a disabled account takes
+  /// effect here, see SessionService.
+  refreshedAt     DateTime @default(now()) @map("refreshed_at") @db.Timestamptz(3)
+  lastSeenAt      DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  ipAddress       String?  @map("ip_address") @db.Inet
+  userAgent       String?  @map("user_agent")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// One in-flight authorization, whether against the account system or against
+/// Microsoft. It exists so that nothing security-relevant has to be parked in a
+/// browser cookie between the redirect out and the redirect back.
+///
+/// The PKCE verifier is stored in the clear. It is worthless without the
+/// authorization code that has not been issued yet, the row lives ten minutes,
+/// and it is deleted the moment it is used.
+model AuthTransaction {
+  id           String   @id @default(uuid()) @db.Uuid
+  /// `oidc` for the account system login, `msa` for a Minecraft profile link.
+  kind         String
+  state        String   @unique
+  nonce        String?
+  codeVerifier String   @map("code_verifier")
+  /// Where to send the browser once this finishes. Validated to be a path
+  /// inside this app before it is stored, never an absolute URL.
+  returnTo     String?  @map("return_to")
+  /// The account starting an MSA link. Null for a login, where there is no
+  /// account yet.
+  accountId    String?  @map("account_id") @db.Uuid
+  expiresAt    DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([expiresAt])
+  @@map("auth_transactions")
+}
+
+/// The link itself: one Minecraft profile, one smto account.
+///
+/// Both sides are unique, and that is the rule the whole feature rests on. A
+/// profile already linked elsewhere is refused rather than moved, so nobody can
+/// walk off with somebody else's statistics by linking their UUID.
+///
+/// Unlinking is a soft delete. The row survives with `unlinkedAt` set, so the
+/// history of who a UUID belonged to stays readable, and the partial unique
+/// indexes below make sure only the live rows have to be unique.
+model MinecraftLink {
+  id           String             @id @default(uuid()) @db.Uuid
+  accountId    String             @map("account_id") @db.Uuid
+  mcUuid       String             @map("mc_uuid") @db.Uuid
+  /// Display only, refreshed opportunistically. The UUID is the identity.
+  mcUsername   String             @map("mc_username_cache")
+  verifiedVia  VerificationMethod @map("verified_via")
+  /// Whatever the verification produced and is worth keeping: the server a code
+  /// was redeemed on, or the Xbox user hash. Never a token.
+  verifiedMeta Json?              @map("verified_meta") @db.JsonB
+  verifiedAt   DateTime           @default(now()) @map("verified_at") @db.Timestamptz(3)
+  unlinkedAt   DateTime?          @map("unlinked_at") @db.Timestamptz(3)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // The two rules this table exists to enforce, one account to one profile and
+  // one profile to one account, apply only to rows that are still live. That is
+  // a partial unique index, which this schema language cannot express, so both
+  // are created by hand in the initial migration. These are the plain indexes
+  // the lookups need.
+  @@index([accountId, unlinkedAt])
+  @@index([mcUuid, unlinkedAt])
+  @@map("minecraft_links")
+}
+
+/// A short-lived code the website shows and a player types in chat.
+///
+/// Single use and single outstanding per account. The code is stored in the
+/// clear on purpose: it lives ten minutes, is worth nothing after being
+/// redeemed, and the plugin has to be able to look it up by exact value.
+model LinkCode {
+  id               String    @id @default(uuid()) @db.Uuid
+  code             String    @unique
+  accountId        String    @map("account_id") @db.Uuid
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt       DateTime? @map("consumed_at") @db.Timestamptz(3)
+  consumedServerId String?   @map("consumed_server_id")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, consumedAt])
+  @@index([expiresAt])
+  @@map("link_codes")
+}
+
+/// Server metadata, public and unauthenticated.
+///
+/// `extra` is the extension point. The launcher's pack JSON carries a dozen
+/// fields this service has no opinion about, and when the launcher migrates
+/// onto this API they go in there rather than into a migration.
+model Server {
+  id             String      @id
+  name           String
+  state          ServerState
+  iconUrl        String?     @map("icon_url")
+  description    String?
+  /// Date only. When the server opened, or is expected to.
+  launchDate     DateTime?   @map("launch_date") @db.Date
+  currentVersion String?     @map("current_version")
+  sortOrder      Int         @default(0) @map("sort_order")
+  /// Hidden from the unauthenticated endpoints while a server is prepared.
+  isPublic       Boolean     @default(true) @map("is_public")
+  extra          Json        @default("{}") @db.JsonB
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  metrics   PlayerMetric[]
+  apiTokens ApiToken[]
+  assets    ServerAsset[]
+
+  @@index([isPublic, sortOrder])
+  @@map("servers")
+}
+
+/// An image an admin uploaded for a server: an icon, a background, whatever the
+/// launcher's pack JSON wants to point at.
+///
+/// Stored in the database rather than on a volume, the same call the skin cache
+/// makes and for the same reasons: the files are small, a redeploy cannot lose
+/// them, and a backup of the database is a backup of everything. Unlike the
+/// skin cache this is not a cache, so dropping the table loses real data.
+///
+/// The name is unique per server on purpose. Re-uploading `background.png`
+/// replaces the bytes and keeps the id, so the URL already pasted into a pack
+/// JSON keeps working and starts serving the new image.
+model ServerAsset {
+  id          String   @id @default(uuid()) @db.Uuid
+  serverId    String   @map("server_id")
+  filename    String
+  contentType String   @map("content_type")
+  byteSize    Int      @map("byte_size")
+  /// SHA-256 of the bytes, hex. Served as the ETag, so a launcher that already
+  /// has the file pays for a 304 rather than the image.
+  checksum    String
+  data        Bytes
+  uploadedBy  String?  @map("uploaded_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, filename])
+  @@index([serverId, createdAt])
+  @@map("server_assets")
+}
+
+/// The whole statistics store, in one table.
+///
+/// One row per player, server and metric name. Adding a statistic is a new row,
+/// never a migration, which is the point: the plugins collect what they collect
+/// and this service does not need to be redeployed to accept a new number.
+///
+/// `valueNum` covers everything numeric and `valueJson` the rare structured
+/// stat. Playtime is simply the metric `playtime_seconds`, with no special
+/// storage of its own.
+///
+/// Keyed by `mcUuid` rather than by account, so a player's statistics survive
+/// unlinking and relinking, and so a plugin can post for a player who has not
+/// linked yet.
+model PlayerMetric {
+  id         String   @id @default(uuid()) @db.Uuid
+  mcUuid     String   @map("mc_uuid") @db.Uuid
+  serverId   String   @map("server_id")
+  metric     String
+  valueNum   BigInt?  @map("value_num")
+  valueJson  Json?    @map("value_json") @db.JsonB
+  /// When the plugin says the reading was taken. Doubles as "last seen here".
+  recordedAt DateTime @default(now()) @map("recorded_at") @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@unique([mcUuid, serverId, metric])
+  @@index([serverId, metric])
+  @@map("player_metrics")
+}
+
+/// A plugin's credential. 256 bits of randomness, stored as SHA-256 only.
+///
+/// Hashed rather than encrypted, unlike the account system's OAuth client
+/// secrets: nothing here ever needs the plaintext back, so there is no reason
+/// to keep a reversible copy.
+model ApiToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  name       String
+  tokenHash  String    @unique @map("token_hash")
+  scopes     String[]
+  /// Restricts the token to one server's data. Null means the whole network.
+  serverId   String?   @map("server_id")
+  createdBy  String?   @map("created_by") @db.Uuid
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  server Server? @relation(fields: [serverId], references: [id], onDelete: SetNull)
+
+  @@index([revokedAt])
+  @@map("api_tokens")
+}
+
+/// Same shape and same reasoning as the account system's audit log: one writer,
+/// one vocabulary, so the log is still usable when somebody needs it.
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  action         String
+  actorAccountId String?  @map("actor_account_id") @db.Uuid
+  targetType     String?  @map("target_type")
+  targetId       String?  @map("target_id")
+  metadata       Json?    @db.JsonB
+  ipAddress      String?  @map("ip_address") @db.Inet
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor Account? @relation(fields: [actorAccountId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
+  @@index([action])
+  @@map("audit_log")
+}
+
+/// A cached Minecraft skin, so the browser never talks to Mojang directly.
+///
+/// This is a cache and nothing more: dropping the table costs one fetch per
+/// player. It exists to keep the session server's rate limit away from a page
+/// that renders one skin per visitor, and to avoid a third-party CDN in the
+/// page's CSP.
+model SkinCache {
+  mcUuid      String   @id @map("mc_uuid") @db.Uuid
+  /// The PNG itself. Skins are 64x64 and a few kilobytes, so a column is
+  /// simpler than a volume and survives a redeploy for free.
+  skin        Bytes
+  /// Alex or Steve proportions, from the texture metadata.
+  slim        Boolean  @default(false)
+  cape        Bytes?
+  /// The texture URL this was fetched from, so an unchanged skin is not refetched.
+  textureUrl  String?  @map("texture_url")
+  fetchedAt   DateTime @default(now()) @map("fetched_at") @db.Timestamptz(3)
+
+  @@map("skin_cache")
+}

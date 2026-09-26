@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+dist
+build
+out
+.svelte-kit
+.git
+# Every environment file. The Dockerfiles copy named paths rather than the
+# whole tree, so none of these would reach an image anyway, but there is no
+# reason to hand the daemon a file full of production secrets as build context.
+.env
+.env.*
+!.env.example
+e2e/test-results
+e2e/playwright-report

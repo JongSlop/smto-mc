@@ -1,0 +1,104 @@
+name: smto-mc-link
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-smto}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-smto_mc_link}
+    volumes:
+      # Postgres 18 wants the mount one level up from the old data/ path so that
+      # pg_upgrade --link can work across a version bump without crossing a mount
+      # boundary. The image puts its data in a versioned subdirectory itself.
+      - postgres-data:/var/lib/postgresql
+    # Loopback only. Nothing outside the compose network needs the database, and
+    # the mapped port exists for a developer running the backend directly.
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5434}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-smto} -d ${POSTGRES_DB:-smto_mc_link}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Overrides whatever DATABASE_URL is in .env: that one points at the
+      # host-mapped port for a developer running the backend directly, while
+      # this container reaches postgres over the compose network by service name
+      # and its real, unmapped port.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-smto}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-smto_mc_link}
+    ports:
+      # 3011, so this stack and the account system's 3000/3001 pair can share a
+      # host without arguing over ports.
+      - '127.0.0.1:3011:3011'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # No curl or wget in a slim image, so a one-line Node request stands in.
+      test:
+        - CMD
+        - node
+        - -e
+        - |
+          require('http').get('http://127.0.0.1:3011/health', (res) => {
+            let body = '';
+            res.on('data', (chunk) => (body += chunk));
+            res.on('end', () => process.exit(JSON.parse(body).status === 'ok' ? 0 : 1));
+          }).on('error', () => process.exit(1));
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 3010
+      # Reaches the backend over the compose network by service name, not
+      # through nginx: nginx only routes traffic from outside the stack.
+      BACKEND_INTERNAL_URL: http://backend:3011
+      # adapter-node trusts these headers to learn the real client IP, scheme
+      # and host from nginx sitting in front. XFF_DEPTH: 1 means exactly one
+      # proxy hop is trusted, which is what this stack has.
+      PROTOCOL_HEADER: x-forwarded-proto
+      HOST_HEADER: x-forwarded-host
+      ADDRESS_HEADER: x-forwarded-for
+      XFF_DEPTH: 1
+      # adapter-node refuses a body over 512 kB by default, which an uploaded
+      # server background is. Kept in step with client_max_body_size in
+      # docs/nginx-snippet.conf and with ASSET_MAX_BYTES in the contracts.
+      BODY_SIZE_LIMIT: 12M
+    ports:
+      - '127.0.0.1:3010:3010'
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - |
+          require('http')
+            .get('http://127.0.0.1:3010/mc/link/', (res) => process.exit(res.statusCode === 200 ? 0 : 1))
+            .on('error', () => process.exit(1));
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:

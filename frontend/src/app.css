@@ -1,0 +1,186 @@
+/*
+ * Design tokens.
+ *
+ * The structure is the account system's, deliberately: same names, same scales,
+ * so anybody who has worked on one app can read the other. What changes is the
+ * palette and the edges. Indigo and soft shadows become grass green over a warm
+ * neutral ramp, with hard offset shadows and two-pixel borders, which is what
+ * reads as Minecraft without dressing the page up as a costume.
+ *
+ * There is no component library. The whole app is a handful of pages, and a
+ * framework would cost more in bundle size and override fights than it saves.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  /* Tighter than the account system's. Blocks have corners. */
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-full: 999px;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace;
+  /*
+   * Headings only, and never body text: a pixel face at paragraph size is
+   * unreadable and the German copy is longer than the English. Silkscreen is
+   * SIL Open Font License. Mojang's own typeface is not used anywhere.
+   */
+  --font-display: 'Silkscreen', var(--font-mono);
+
+  --text-xs: 0.78rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.15rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+
+  --accent: #3f8f29;
+  --accent-strong: #2f6b1f;
+  --accent-contrast: #ffffff;
+  --accent-subtle: rgb(63 143 41 / 12%);
+
+  --danger: #a33131;
+  --danger-subtle: rgb(163 49 49 / 10%);
+  --success: #2f6b1f;
+  --success-subtle: rgb(47 107 31 / 12%);
+  --warning: #a86617;
+  --warning-subtle: rgb(168 102 23 / 12%);
+
+  --bg: #f2efe6;
+  --bg-elevated: #fbf9f4;
+  --bg-sunken: #e5e0d3;
+  --border: #cfc7b4;
+  --border-strong: #9d947e;
+  --fg: #23201a;
+  --fg-muted: #5f594c;
+
+  /*
+   * Hard, offset, unblurred. A blurred shadow reads as glass; this reads as a
+   * block sitting on a surface, which is the whole idea.
+   */
+  --shadow-sm: 2px 2px 0 rgb(35 32 26 / 12%);
+  --shadow-md: 4px 4px 0 rgb(35 32 26 / 16%);
+
+  --focus-ring: 0 0 0 3px var(--accent-subtle);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #7bc95c;
+    --accent-strong: #9ddb84;
+    --accent-contrast: #14170f;
+    --accent-subtle: rgb(123 201 92 / 16%);
+
+    --danger: #e07a7a;
+    --danger-subtle: rgb(224 122 122 / 14%);
+    --success: #7bc95c;
+    --success-subtle: rgb(123 201 92 / 14%);
+    --warning: #e0b054;
+    --warning-subtle: rgb(224 176 84 / 14%);
+
+    --bg: #15140f;
+    --bg-elevated: #1f1d16;
+    --bg-sunken: #0d0c09;
+    --border: #38352a;
+    --border-strong: #4d493b;
+    --fg: #ece8dc;
+    --fg-muted: #a29b88;
+
+    --shadow-sm: 2px 2px 0 rgb(0 0 0 / 45%);
+    --shadow-md: 4px 4px 0 rgb(0 0 0 / 55%);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.3;
+  /* Pixel faces have no kerning worth tightening, and a negative tracking
+     smears the stems together at display sizes. */
+  letter-spacing: 0;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--accent-strong);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/*
+ * Every skin, avatar and server icon in this app is a small, deliberately
+ * low-resolution image. Smoothing them turns 16 pixels of intent into mush, so
+ * nearest-neighbour is the correct rendering and not a stylistic flourish. The
+ * launcher already does the same thing with its pack icons.
+ */
+.pixelated {
+  image-rendering: pixelated;
+}
+
+/* Visible only to screen readers, and to keyboard users once focused. */
+.visually-hidden:not(:focus):not(:active) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "@smto/mc-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    }
+  },
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run build:esm && pnpm run build:cjs",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/write-cjs-marker.mjs",
+    "dev": "tsc -p tsconfig.esm.json --watch",
+    "typecheck": "tsc -p tsconfig.esm.json --noEmit",
+    "test": "echo \"no tests\" && exit 0"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

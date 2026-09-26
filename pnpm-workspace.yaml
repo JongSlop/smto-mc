@@ -1,0 +1,13 @@
+packages:
+  - packages/*
+  - backend
+  - frontend
+  - e2e
+allowBuilds:
+  # Native and platform-specific builds we actually need.
+  '@prisma/engines': true
+  '@swc/core': true
+  esbuild: true
+  prisma: true
+  # Analytics package pulled in transitively. Nothing here needs it to run.
+  '@scarf/scarf': false

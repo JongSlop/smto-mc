@@ -1,0 +1,121 @@
+# The stack as it runs on the server, pulling images that GitHub Actions built
+# rather than building them here. A deploy target needs exactly two files from
+# this repo, this one and a filled in .env, and no source checkout at all.
+#
+# Kept separate from docker-compose.yml rather than layered over it as an
+# override, because an override cannot remove the `build:` section, and a server
+# with no source tree must never fall back to building. The cost is that the
+# postgres service and the two healthchecks are spelled out in both files. If you
+# change one, change the other.
+
+name: smto-mc-link
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-smto}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-smto_mc_link}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    # No published port at all here. Unlike the development file, nothing on
+    # this machine has any business connecting to it from outside the stack.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-smto} -d ${POSTGRES_DB:-smto_mc_link}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ${IMAGE_REPO:-ghcr.io/jongslop/smto-account-mc-link}-backend:${IMAGE_TAG:-main}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-smto}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-smto_mc_link}
+    labels:
+      # Watchtower only touches what carries this. Postgres deliberately does
+      # not: a silent jump to the next major version would leave the container
+      # refusing to start on a data directory it considers too old.
+      com.centurylinklabs.watchtower.enable: 'true'
+    ports:
+      - '127.0.0.1:3011:3011'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - |
+          require('http').get('http://127.0.0.1:3011/health', (res) => {
+            let body = '';
+            res.on('data', (chunk) => (body += chunk));
+            res.on('end', () => process.exit(JSON.parse(body).status === 'ok' ? 0 : 1));
+          }).on('error', () => process.exit(1));
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    image: ${IMAGE_REPO:-ghcr.io/jongslop/smto-account-mc-link}-frontend:${IMAGE_TAG:-main}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 3010
+      BACKEND_INTERNAL_URL: http://backend:3011
+      PROTOCOL_HEADER: x-forwarded-proto
+      HOST_HEADER: x-forwarded-host
+      ADDRESS_HEADER: x-forwarded-for
+      XFF_DEPTH: 1
+      # adapter-node refuses a body over 512 kB by default, which an uploaded
+      # server background is. Kept in step with client_max_body_size in
+      # docs/nginx-snippet.conf and with ASSET_MAX_BYTES in the contracts.
+      BODY_SIZE_LIMIT: 12M
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+    ports:
+      - '127.0.0.1:3010:3010'
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - |
+          require('http')
+            .get('http://127.0.0.1:3010/mc/link/', (res) => process.exit(res.statusCode === 200 ? 0 : 1))
+            .on('error', () => process.exit(1));
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    restart: unless-stopped
+    volumes:
+      # Read and write on the docker socket is what lets it replace containers,
+      # and it is also full control of this host. That is the price of pulling
+      # updates instead of letting GitHub reach in over SSH.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # The images are private, so it authenticates as a machine reader. Its
+    # credentials live in a file of their own rather than in .env, because .env
+    # is handed wholesale to the backend and the frontend and neither of them has
+    # any reason to hold a registry token. Two lines, REPO_USER and REPO_PASS.
+    env_file: .env.registry
+    environment:
+      WATCHTOWER_LABEL_ENABLE: 'true'
+      # Deletes the image that was just replaced, so a server that redeploys for
+      # months does not fill its disk with old layers.
+      WATCHTOWER_CLEANUP: 'true'
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-300}
+      WATCHTOWER_INCLUDE_RESTARTING: 'true'
+
+volumes:
+  postgres-data:

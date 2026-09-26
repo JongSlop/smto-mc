@@ -1,0 +1,19 @@
+node_modules/
+dist/
+build/
+out/
+.svelte-kit/
+coverage/
+# Every environment file, however it is suffixed: .env, .env.prod,
+# .env.registry, .env.local. Listing them one by one is how the next one
+# somebody invents ends up committed with real secrets in it.
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+frontend/src/lib/paraglide/
+# Paraglide regenerates everything in project.inlang except the settings file.
+frontend/project.inlang/*
+!frontend/project.inlang/settings.json
+e2e/test-results/
+e2e/playwright-report/

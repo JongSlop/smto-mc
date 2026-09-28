@@ -38,6 +38,9 @@ async function linkNotch(prisma: PrismaService, accountId: string): Promise<void
  * something a test run gets to do: setup-e2e.ts switches it off outright and
  * these specs switch it back on against an address that does not exist.
  */
+/** Read rather than assumed: CI configures its own PUBLIC_ORIGIN. */
+const ORIGIN = (process.env.PUBLIC_ORIGIN ?? '').replace(/\/$/, '');
+
 describe('other services, uploader configured', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -108,7 +111,7 @@ describe('other services, uploader configured', () => {
     expect(response.body.expiresIn).toBe(300);
     const minted = new URL(response.body.url as string);
     expect(minted.origin + minted.pathname).toBe(`${BASE}/link/abc123`);
-    expect(minted.searchParams.get('logoutUrl')).toBe('http://localhost:3010/mc/link/');
+    expect(minted.searchParams.get('logoutUrl')).toBe(`${ORIGIN}/`);
     expect(minted.searchParams.get('intent')).toBeNull();
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -144,7 +147,7 @@ describe('other services, uploader configured', () => {
       const minted = new URL(response.body.url as string);
       expect(minted.origin + minted.pathname).toBe(`${BASE}/link/abc123`);
       expect(minted.searchParams.get('intent')).toBe(intent);
-      expect(minted.searchParams.get('logoutUrl')).toBe('http://localhost:3010/mc/link/');
+      expect(minted.searchParams.get('logoutUrl')).toBe(`${ORIGIN}/`);
 
       const entry = await prisma.auditLog.findFirstOrThrow({
         where: { action: 'uploader_session_issued' },

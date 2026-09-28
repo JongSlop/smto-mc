@@ -22,6 +22,13 @@ const PNG = Buffer.from(
 /** A JPEG's first bytes, which is all the sniffer looks at. */
 const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 7)]);
 
+/**
+ * Read rather than assumed. CI runs with its own PUBLIC_ORIGIN, and a test that
+ * spells the development value out passes here and fails there for a reason
+ * that has nothing to do with what it is testing.
+ */
+const ORIGIN = (process.env.PUBLIC_ORIGIN ?? '').replace(/\/$/, '');
+
 describe('server assets', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -67,9 +74,7 @@ describe('server assets', () => {
     });
     // Built from PUBLIC_ORIGIN, because that is the address a pack JSON has to
     // carry: the internal path is not the public one.
-    expect(created.body.url).toBe(
-      `http://localhost:3010/mc/link/api/v1/public/assets/${created.body.id}/icon.png`,
-    );
+    expect(created.body.url).toBe(`${ORIGIN}/api/v1/public/assets/${created.body.id}/icon.png`);
 
     const served = await request(app.getHttpServer())
       .get(`/api/v1/public/assets/${created.body.id}/icon.png`)

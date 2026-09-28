@@ -76,9 +76,19 @@ export class BackchannelLogoutService {
     // Both when we have both: the sid says which of the provider's sessions
     // ended, and the sub keeps one client's session id from ever reaching
     // another account's rows.
+    //
+    // The null case is the awkward one and is deliberate. A session opened
+    // before the provider was asked to send a sid has none stored, so a logout
+    // token naming a session would never match it and the person would stay
+    // signed in here with no way to notice. Those rows cannot be told apart
+    // from each other, so any logout for that account takes them: a logout
+    // that misses is worse than one that reaches a second tab.
     const where =
       claims.sid && claims.sub
-        ? { oidcSid: claims.sid, accountId: claims.sub }
+        ? {
+            accountId: claims.sub,
+            OR: [{ oidcSid: claims.sid }, { oidcSid: null }],
+          }
         : claims.sid
           ? { oidcSid: claims.sid }
           : { accountId: claims.sub! };

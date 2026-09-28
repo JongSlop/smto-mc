@@ -139,6 +139,24 @@ describe('POST /api/v1/auth/backchannel-logout', () => {
     expect(left.map((row) => row.oidcSid)).toEqual(['sid-desktop']);
   });
 
+  it('also ends a session from before the provider sent session ids', async () => {
+    await createSession(app, prisma, account, 'sid-phone');
+    // No sid: opened before the client registered a back-channel logout URI,
+    // so the provider was not yet including the claim.
+    await createSession(app, prisma, account);
+
+    const other = await createAccount(prisma, 'somebody-else');
+    await createSession(app, prisma, other);
+
+    await post(await logoutToken({ sid: 'sid-phone' })).expect(200);
+
+    // Both of this account's rows are gone, the stranger's is not. A session
+    // that cannot be attributed to a provider session would otherwise survive
+    // every logout there is.
+    const left = await prisma.session.findMany({ select: { accountId: true } });
+    expect(left.map((row) => row.accountId)).toEqual([other]);
+  });
+
   it('ends every session of an account when no sid is sent', async () => {
     await createSession(app, prisma, account, 'sid-phone');
     await createSession(app, prisma, account);

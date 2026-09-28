@@ -94,8 +94,14 @@ instruction, and it would pass everything else.
 
 Sessions carry the provider's `sid`, so a logout takes out the one browser it
 happened in rather than every device the person is signed in on. A token with
-both `sid` and `sub` has to match both, so one client's session id can never
-end another account's session. Token ids are remembered for five minutes to
+both `sid` and `sub` is matched on both, so one client's session id can never
+end another account's session.
+
+The exception is a session opened before the provider was asked to send a
+`sid`, which has none stored. Those rows cannot be told apart, so any logout
+for that account takes them: a logout that silently misses is worse than one
+that also closes a second tab. They stop appearing as soon as everybody has
+signed in once since the back-channel URI was registered. Token ids are remembered for five minutes to
 refuse a replay, which matters little on its own since deleting a deleted
 session does nothing, and costs nothing.
 

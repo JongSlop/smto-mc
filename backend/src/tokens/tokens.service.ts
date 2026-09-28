@@ -123,11 +123,27 @@ export class TokensService {
 
   /**
    * Resolves a presented token. Throws rather than returning null, because the
-   * only caller is a guard and the failure is always the same.
+   * only caller is a guard and the failure is nearly always the same.
+   *
+   * The one distinction it does make is between a token that is not ours and a
+   * string that was never a token at all, because the two send somebody looking
+   * in completely different places. A header sent twice arrives here as
+   * `smtomc_a, smtomc_a`, since Node joins repeated headers, and a plugin
+   * reading its key out of a config file can easily pick up a line break or a
+   * quote with it. Answering `invalid_api_token` to those costs an afternoon of
+   * minting fresh tokens that fail exactly the same way.
+   *
+   * Nothing is given away by saying so: the shape is documented, and the reply
+   * is the same for a well-formed token that does not exist and one that was
+   * revoked.
    */
   async authenticate(
     presented: string,
   ): Promise<{ scopes: ApiTokenScope[]; serverId: string | null }> {
+    if (!isWellFormedToken(presented)) {
+      throw new UnauthorizedException('malformed_api_key');
+    }
+
     const row = await this.prisma.apiToken.findUnique({
       where: { tokenHash: sha256Hex(presented) },
     });
@@ -151,4 +167,25 @@ export class TokensService {
       });
     }
   }
+}
+
+/**
+ * Whether this could be one of our tokens at all.
+ *
+ * Deliberately shape only, never a guess at validity: the prefix and the
+ * base64url alphabet are both public, and the length is what `create` issues.
+ * Anything else is a transport or configuration mistake rather than a wrong
+ * credential.
+ */
+function isWellFormedToken(presented: string): boolean {
+  if (!presented.startsWith(API_TOKEN_PREFIX)) {
+    return false;
+  }
+
+  const secret = presented.slice(API_TOKEN_PREFIX.length);
+
+  // 32 random bytes, base64url: always 43 characters, and nothing outside that
+  // alphabet. A repeated header (", ") and a stray quote or newline both fail
+  // here rather than being hashed into a lookup that cannot match.
+  return /^[A-Za-z0-9_-]{43}$/.test(secret);
 }

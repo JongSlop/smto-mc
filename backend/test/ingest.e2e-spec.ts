@@ -238,6 +238,43 @@ describe('POST /api/v1/ingest', () => {
         .expect(403);
     });
 
+    /**
+     * The message a plugin author gets when the key never made it into the
+     * request intact, which in practice is a repeated header (Node joins them
+     * with a comma) or a key read out of a config file with a quote or a line
+     * break still attached. Both used to answer `invalid_api_token`, which
+     * sends somebody off minting tokens that fail in exactly the same way.
+     */
+    it.each([
+      [
+        'a repeated header',
+        'smtomc_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA, smtomc_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      ],
+      ['a stray quote', '"smtomc_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"'],
+      ['no prefix', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'],
+      ['a truncated key', 'smtomc_AAAAAAAA'],
+    ])('says so when the key is not a key at all: %s', async (_case, presented) => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/ingest/metrics')
+        .set('X-Api-Key', presented)
+        .send({ serverId: 'i5', entries: [] })
+        .expect(401);
+
+      expect(response.body.message).toBe('malformed_api_key');
+    });
+
+    it('still says invalid_api_token for a well formed key that is not ours', async () => {
+      // The distinction only points at the transport. A key with the right
+      // shape that nobody issued gets the same answer as a revoked one.
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/ingest/metrics')
+        .set('X-Api-Key', `smtomc_${'B'.repeat(43)}`)
+        .send({ serverId: 'i5', entries: [] })
+        .expect(401);
+
+      expect(response.body.message).toBe('invalid_api_token');
+    });
+
     it('refuses a revoked token', async () => {
       await createServer(prisma);
       const token = await createApiToken(prisma, { scopes: ['stats:write'] });

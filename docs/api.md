@@ -56,6 +56,21 @@ Scopes:
 | `link:redeem` | `POST /ingest/link/redeem` |
 | `link:read`   | `GET /ingest/link/{uuid}`  |
 
+Two different 401s come back, and the difference is worth reading:
+
+| `message`             | What it means                                                |
+| --------------------- | ------------------------------------------------------------ |
+| `missing_credentials` | No `X-Api-Key` header arrived at all                         |
+| `malformed_api_key`   | Something arrived, but it is not the shape of a key          |
+| `invalid_api_token`   | A well-formed key that was never issued, or has been revoked |
+
+`malformed_api_key` is about the request, not the credential, and it means a
+fresh token will fail in exactly the same way. The two usual causes are the
+header being sent twice, which arrives here as `smtomc_a, smtomc_a` because
+repeated headers are joined with a comma, and a key read out of a config file
+with a quote or a line break still attached. Print the header your client
+actually sends before minting anything.
+
 **Issue one token per server, pinned to that server.** A pinned token can only
 write its own server's data, so a config file that leaks cannot be used to
 rewrite another server's statistics. An unpinned token can write for any server

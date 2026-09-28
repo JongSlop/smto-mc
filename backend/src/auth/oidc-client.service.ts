@@ -24,6 +24,14 @@ export interface IdTokenClaims {
   picture?: string;
   roles?: string[];
   nonce?: string;
+  /**
+   * Which of the provider's own sessions this login belongs to. Sent only when
+   * the client is registered with a back-channel logout URI and
+   * `backchannel_logout_session_required`, so it is optional here: a
+   * deployment whose client predates that registration still works, it just
+   * logs out per account rather than per session.
+   */
+  sid?: string;
 }
 
 export interface TokenSet {
@@ -38,6 +46,8 @@ export interface ResolvedIdentity {
   username: string;
   avatarUrl: string | null;
   roles: string[];
+  /** The provider's session id, when it sends one. See IdTokenClaims.sid. */
+  sid: string | null;
   tokens: TokenSet;
 }
 
@@ -303,6 +313,7 @@ export class OidcClientService {
       username: claims.preferred_username ?? claims.sub,
       avatarUrl: claims.picture ?? null,
       roles: Array.isArray(claims.roles) ? claims.roles : [],
+      sid: claims.sid ?? null,
       tokens,
     };
   }

@@ -45,6 +45,32 @@ UI once they are deployed with the migration that added it
 revokes our refresh token, and leaves their single sign-on cookie alone, so the
 next sign-in does not ask for a password again.
 
+### 1b. Wire up logout, both directions
+
+Two settings, and skipping either leaves a logout that does not log out.
+
+On the client row in `https://smto.dev/account/admin/oauth-clients`:
+
+| Field                                | Value                                                     |
+| ------------------------------------ | --------------------------------------------------------- |
+| Post-logout redirect URI             | `https://smto.dev/mc/link/`                               |
+| Back-channel logout URI              | `https://smto.dev/mc/link/api/v1/auth/backchannel-logout` |
+| Back-channel logout session required | on                                                        |
+
+In this service's `.env`:
+
+```
+OIDC_POST_LOGOUT_REDIRECT_URI=https://smto.dev/mc/link/
+```
+
+The account system also needs `features.backchannelLogout` enabled on its
+provider, and its own page logout has to end the provider session, or a logout
+on the account pages still leaves every relying party signed in.
+
+Check it by signing in, signing out on the account pages, and reloading the
+dashboard here: it should send you back to the start. Without the back-channel
+half, the session survives until its own expiry.
+
 ### 2. Add a Web platform to the launcher's Azure app
 
 Only needed for the Microsoft linking path. Leaving `MSA_CLIENT_SECRET` empty

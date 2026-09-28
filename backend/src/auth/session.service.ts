@@ -79,6 +79,7 @@ export class SessionService {
         tokenHash: sha256Hex(token),
         accountId: account.id,
         refreshTokenEnc: this.cipher.encrypt(identity.tokens.refreshToken),
+        oidcSid: identity.sid,
         expiresAt,
         ipAddress: context.ipAddress ?? null,
         userAgent: context.userAgent?.slice(0, 500) ?? null,
@@ -197,6 +198,9 @@ export class SessionService {
           // between the two cannot leave a session holding a token the account
           // system has already retired.
           ...(rotated ? { refreshTokenEnc: this.cipher.encrypt(rotated) } : {}),
+          // A session that predates the sid being sent picks one up here,
+          // rather than staying anonymous until the person signs in again.
+          ...(identity.sid ? { oidcSid: identity.sid } : {}),
           refreshedAt: new Date(),
           expiresAt: new Date(Date.now() + this.ttlMs),
         },

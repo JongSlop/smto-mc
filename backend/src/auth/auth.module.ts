@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { SecretCipherService } from '../common/crypto/secret-cipher.service';
 import { AuthController } from './auth.controller';
+import { BackchannelLogoutService } from './backchannel-logout.service';
 import { AuthTransactionService } from './auth-transaction.service';
 import { OidcClientService } from './oidc-client.service';
 import { OidcDiscoveryService } from './oidc-discovery.service';
@@ -20,7 +21,8 @@ import { SessionService } from './session.service';
     SecretCipherService,
     SessionService,
     AuthTransactionService,
+    BackchannelLogoutService,
   ],
-  exports: [SessionService, AuthTransactionService, SecretCipherService],
+  exports: [SessionService, AuthTransactionService, SecretCipherService, BackchannelLogoutService],
 })
 export class AuthModule {}

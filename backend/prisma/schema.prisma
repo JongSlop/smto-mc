@@ -79,6 +79,14 @@ model Session {
   /// every use and treats a replay as a compromise, so the new value has to be
   /// written back immediately.
   refreshTokenEnc String   @map("refresh_token_enc")
+  /// The account system's own session id, from the `sid` claim.
+  ///
+  /// This is what makes a back-channel logout precise. The provider tells us
+  /// which of its sessions ended, and one person can hold several: a phone and
+  /// a desktop are two sessions over there and two rows here, and signing out
+  /// on one should not sign the other out. Null for rows created before the
+  /// provider was asked to send the claim, which fall back to the account.
+  oidcSid         String?  @map("oidc_sid")
   /// When the account system's refresh token itself runs out.
   expiresAt       DateTime @map("expires_at") @db.Timestamptz(3)
   /// Last time the roles and profile on the account were re-read from the
@@ -94,6 +102,7 @@ model Session {
 
   @@index([accountId])
   @@index([expiresAt])
+  @@index([oidcSid])
   @@map("sessions")
 }
 

@@ -116,6 +116,7 @@ export async function createSession(
   app: INestApplication,
   prisma: PrismaService,
   accountId: string,
+  oidcSid?: string,
 ): Promise<string> {
   const token = randomBytes(32).toString('base64url');
 
@@ -124,6 +125,9 @@ export async function createSession(
       tokenHash: createHash('sha256').update(token).digest('hex'),
       accountId,
       refreshTokenEnc: app.get(SecretCipherService).encrypt('test-refresh-token'),
+      // Which of the provider's sessions this one came from, for the
+      // back-channel logout tests. A real login reads it off the ID token.
+      oidcSid: oidcSid ?? null,
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     },
   });

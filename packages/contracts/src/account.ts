@@ -50,6 +50,7 @@ export const AUDIT_ACTIONS = [
   'server_deleted',
   'server_asset_uploaded',
   'server_asset_deleted',
+  'session_ended_by_provider',
   'metric_rejected',
   'uploader_session_issued',
 ] as const;

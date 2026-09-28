@@ -65,6 +65,40 @@ the rotated value is written back inside the same transaction as the account
 update. A crash between the two would otherwise leave a session holding a token
 the account system has already retired.
 
+## Logging out
+
+Three things have to happen for a logout to mean what people assume it means,
+and they are separate mechanisms.
+
+**Logging out here** ends the session row and revokes the refresh token, then
+sends the browser to the account system's `end_session_endpoint` so its own
+session ends too. That last step only happens when
+`OIDC_POST_LOGOUT_REDIRECT_URI` is set and registered on the client; with it
+empty, signing out here and signing straight back in never asks for a password,
+because the provider still holds a session and answers the next authorize
+silently.
+
+**Logging out over there** reaches us through OpenID Connect Back-Channel
+Logout. The provider posts a signed logout token to
+`/api/v1/auth/backchannel-logout` and we delete the sessions it names. Nothing
+else would work: our session holds an `offline_access` refresh token, which by
+design keeps working while the person is away, so no amount of re-checking on
+our side would notice that their browser session is over.
+
+The endpoint is public because the token is the credential. It is verified
+against the provider's keys, must name this client in `aud`, must carry the
+`http://schemas.openid.net/event/backchannel-logout` event, and must **not**
+carry a `nonce`. That last rule is the one doing the security work: without it,
+an ID token from a real login could be posted here as though it were a logout
+instruction, and it would pass everything else.
+
+Sessions carry the provider's `sid`, so a logout takes out the one browser it
+happened in rather than every device the person is signed in on. A token with
+both `sid` and `sub` has to match both, so one client's session id can never
+end another account's session. Token ids are remembered for five minutes to
+refuse a replay, which matters little on its own since deleting a deleted
+session does nothing, and costs nothing.
+
 ## Authorization flows
 
 Two flows, both authorization code with PKCE S256, and both with the same shape.

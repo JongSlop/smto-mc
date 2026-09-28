@@ -67,9 +67,23 @@ The account system also needs `features.backchannelLogout` enabled on its
 provider, and its own page logout has to end the provider session, or a logout
 on the account pages still leaves every relying party signed in.
 
-Check it by signing in, signing out on the account pages, and reloading the
-dashboard here: it should send you back to the start. Without the back-channel
-half, the session survives until its own expiry.
+Two halves of it can be checked without signing in at all:
+
+```bash
+# The provider accepts our post-logout URI, and only ours
+curl -sI "https://smto.dev/account/oauth/session/end?client_id=smto-mc-link\
+&post_logout_redirect_uri=https%3A%2F%2Fsmto.dev%2Fmc%2Flink%2F" | head -1   # 200
+curl -s "https://smto.dev/account/oauth/session/end?client_id=smto-mc-link\
+&post_logout_redirect_uri=https%3A%2F%2Fevil.example%2F" | grep -o 'not registered'
+
+# Our endpoint exists and refuses nonsense
+curl -s -X POST -d 'logout_token=not-a-token' \
+  https://smto.dev/mc/link/api/v1/auth/backchannel-logout                    # 400
+```
+
+The rest needs a person: sign in, sign out on the account pages, and reload the
+dashboard here. It should send you back to the start. Without the back-channel
+half registered, the session survives until its own expiry instead.
 
 ### 2. Add a Web platform to the launcher's Azure app
 

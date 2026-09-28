@@ -97,17 +97,22 @@ services:
       start_period: 10s
 
   watchtower:
-    image: containrrr/watchtower:1.7.1
+    # A maintained fork rather than containrrr/watchtower, which has had no
+    # release since 2023 and talks Docker API 1.25. Engines from 25 on refuse
+    # anything below 1.40, so the original sits in a restart loop logging
+    # "client version 1.25 is too old" and silently stops updating anything.
+    image: ghcr.io/nicholas-fedor/watchtower:1.12.0
     restart: unless-stopped
     volumes:
       # Read and write on the docker socket is what lets it replace containers,
       # and it is also full control of this host. That is the price of pulling
       # updates instead of letting GitHub reach in over SSH.
       - /var/run/docker.sock:/var/run/docker.sock
-    # The images are private, so it authenticates as a machine reader. Its
-    # credentials live in a file of their own rather than in .env, because .env
-    # is handed wholesale to the backend and the frontend and neither of them has
-    # any reason to hold a registry token. Two lines, REPO_USER and REPO_PASS.
+    # Registry credentials, needed while the packages are private and harmless
+    # once they are public. They live in a file of their own rather than in
+    # .env, because .env is handed wholesale to the backend and the frontend and
+    # neither of them has any reason to hold a registry token. Two lines,
+    # REPO_USER and REPO_PASS.
     env_file: .env.registry
     environment:
       WATCHTOWER_LABEL_ENABLE: 'true'

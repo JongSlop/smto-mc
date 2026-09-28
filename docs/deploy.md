@@ -125,6 +125,17 @@ never pushes the checked-in defaults back over an admin's edits.
 Watchtower picks up new images from GHCR on its own, the same as the account
 system's.
 
+It runs `ghcr.io/nicholas-fedor/watchtower`, a maintained fork, and not
+`containrrr/watchtower`, which has had no release since 2023. The original
+speaks Docker API 1.25 and every engine from 25 on refuses anything below 1.40,
+so it ends up in a restart loop logging `client version 1.25 is too old` and
+quietly updating nothing at all. Worth checking after an engine upgrade:
+
+```bash
+docker ps --format '{{.Names}}\t{{.Status}}' | grep watchtower   # not "Restarting"
+docker logs --tail 20 smto-mc-link-watchtower-1
+```
+
 ## Checking it worked
 
 ```bash

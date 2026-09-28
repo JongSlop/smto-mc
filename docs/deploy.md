@@ -159,8 +159,15 @@ docker compose -f docker-compose.prod.yml up -d
 ```
 
 The backend's entrypoint runs `prisma migrate deploy` and then the seed on every
-start. The seed fills an empty server list and leaves existing rows alone, so it
-never pushes the checked-in defaults back over an admin's edits.
+start. The seed only ever acts on an **empty** server table: one row, `i5`, so
+a fresh deployment is not blank. If the table has anything in it the seed does
+nothing at all, which is what makes deleting a server in the admin area stick
+rather than coming back at the next deploy.
+
+Servers are added through the admin area as they start reporting. The packs
+that have not been integrated yet are still described by the launcher's own
+JSON at `https://smto.dev/mc/launcher/v2/pack-<id>.json`, which is where to
+copy their metadata from.
 
 Watchtower picks up new images from GHCR on its own, the same as the account
 system's.

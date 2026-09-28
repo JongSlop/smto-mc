@@ -2,11 +2,22 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, ServerState } from '@prisma/client';
 
 /**
- * Seeds the server list from what the network already runs.
+ * Puts one server in the list so a fresh deployment is not empty.
  *
- * Safe to repeat, because the entrypoint runs it on every container start.
- * Existing rows are left alone entirely: this fills an empty table, it does not
- * push the launcher's JSON back over an admin's edits.
+ * This runs on every container start, so what it does when the table already
+ * has rows matters more than what it does when it is empty: **nothing**. It
+ * bootstraps, once, and never again.
+ *
+ * Checking each id instead, which is what this used to do, quietly undid
+ * administration: a server deleted in the admin area came back at the next
+ * deploy, every deploy, with no way to make it stay gone short of editing this
+ * file. One check against an empty table has no such failure mode.
+ *
+ * Only `i5` is here because only `i5` reports to this service. The other packs
+ * are still described by the launcher's own JSON at
+ * https://smto.dev/mc/launcher/v2/pack-<id>.json, which is where their
+ * metadata should be copied from when they are integrated, through the admin
+ * area rather than through here.
  */
 
 interface SeedServer {
@@ -46,58 +57,6 @@ const SERVERS: SeedServer[] = [
       config: { ampPort: '27010' },
     },
   },
-  {
-    id: 'i4',
-    name: 'Schacramento 2022 (I4)',
-    state: ServerState.ONGOING,
-    description: 'The longest-running building server in smto.dev history!',
-    launchDate: '2022-08-26',
-    currentVersion: '1.21.11',
-    sortOrder: 20,
-    extra: {
-      ip: 'mc.smto.dev',
-      game: { loader: 'FABRIC', type: 'AUTOMODPACK' },
-    },
-  },
-  {
-    id: 'g3',
-    name: 'Schacramento 2025 (G3)',
-    state: ServerState.ARCHIVED,
-    description: 'Island-City with server-side mods!',
-    launchDate: '2024-11-01',
-    currentVersion: '1.21.3',
-    sortOrder: 30,
-    extra: {
-      ip: 'g3.smto.dev',
-      game: { version: '1.21.3', java: 21, loader: 'FABRIC', type: 'ARCHIVE' },
-    },
-  },
-  {
-    id: 'g1',
-    name: 'Kingdoms',
-    state: ServerState.ARCHIVED,
-    description: 'A fully custom fabric modpack!',
-    launchDate: '2024-05-01',
-    currentVersion: '1.20.1',
-    sortOrder: 40,
-    extra: {
-      ip: 'g1.smto.dev',
-      game: { version: '1.20.1', java: 17, loader: 'FABRIC', type: 'ARCHIVE' },
-    },
-  },
-  {
-    id: 'i3',
-    name: 'Schacramento 2020 (I3)',
-    state: ServerState.ARCHIVED,
-    description: 'The first cohesive city!',
-    launchDate: '2020-01-01',
-    currentVersion: '1.20.1',
-    sortOrder: 50,
-    extra: {
-      ip: 'i3.smto.dev',
-      game: { version: '1.20.1', java: 17, loader: 'FABRIC', type: 'ARCHIVE' },
-    },
-  },
 ];
 
 async function main(): Promise<void> {
@@ -106,39 +65,30 @@ async function main(): Promise<void> {
   });
 
   try {
-    let created = 0;
+    // One question, asked of the table rather than of each id: has anybody
+    // administered this list yet? If they have, in either direction, it is
+    // theirs and this script has no business in it.
+    const existing = await prisma.server.count();
 
-    for (const server of SERVERS) {
-      // createMany with skipDuplicates would do this in one statement, but one
-      // at a time makes the "how many were new" count honest, and this runs
-      // five times at startup.
-      const existing = await prisma.server.findUnique({ where: { id: server.id } });
-
-      if (existing) {
-        continue;
-      }
-
-      await prisma.server.create({
-        data: {
-          id: server.id,
-          name: server.name,
-          state: server.state,
-          description: server.description,
-          launchDate: new Date(server.launchDate),
-          currentVersion: server.currentVersion,
-          sortOrder: server.sortOrder,
-          extra: server.extra,
-        },
-      });
-
-      created += 1;
+    if (existing > 0) {
+      console.log(`Seed: ${existing} server${existing === 1 ? '' : 's'} already present, skipping`);
+      return;
     }
 
-    console.log(
-      created === 0
-        ? 'Seed: server list already populated, nothing to do'
-        : `Seed: created ${created} server${created === 1 ? '' : 's'}`,
-    );
+    await prisma.server.createMany({
+      data: SERVERS.map((server) => ({
+        id: server.id,
+        name: server.name,
+        state: server.state,
+        description: server.description,
+        launchDate: new Date(server.launchDate),
+        currentVersion: server.currentVersion,
+        sortOrder: server.sortOrder,
+        extra: server.extra,
+      })),
+    });
+
+    console.log(`Seed: created ${SERVERS.length} server${SERVERS.length === 1 ? '' : 's'}`);
   } finally {
     await prisma.$disconnect();
   }

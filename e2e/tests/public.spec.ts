@@ -38,15 +38,16 @@ test.describe('anonymous', () => {
     ).toBeVisible();
   });
 
-  test('the archive lists the closed servers and nothing else', async ({ page }) => {
+  test('the archive renders, and says so when nothing is archived', async ({ page }) => {
     // Public like the server pages themselves. The header entry that points
     // here needs a session, the page does not.
     await page.goto(`${APP}/servers/archived`);
 
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    // Seeded from the live pack JSON: g3, g1 and i3 are closed, i5 and i4 run.
-    await expect(page.getByRole('link', { name: /Kingdoms/ })).toBeVisible();
+    // The seed creates i5 and nothing else, and i5 is running, so this page has
+    // nothing to list and has to say that rather than render an empty box.
     await expect(page.getByRole('link', { name: /Laced Pack/ })).toHaveCount(0);
+    await expect(page.getByText(/nothing has been archived/i)).toBeVisible();
   });
 
   test('an unknown server is a 404, not an empty page', async ({ page }) => {

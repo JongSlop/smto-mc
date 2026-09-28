@@ -110,6 +110,43 @@ describe('POST /api/v1/auth/backchannel-logout', () => {
       .send({ logout_token: token });
   }
 
+  // Temporary diagnostic: CI rejects tokens this machine accepts, with the same
+  // code and the same jose build. Fails on purpose so the values reach the log,
+  // since vitest swallows console output from a passing test.
+  it('diagnostic', async () => {
+    const { ConfigService } = await import('@nestjs/config');
+    const { jwtVerify } = await import('jose');
+
+    const config = app.get(ConfigService);
+    const discovery = app.get(OidcDiscoveryService);
+    const token = await logoutToken({ sid: 'sid-phone' });
+
+    let verify = 'OK';
+    try {
+      await jwtVerify(token, await discovery.keys(), {
+        issuer: discovery.issuerUrl,
+        audience: config.get('OIDC_CLIENT_ID') as string,
+        typ: 'logout+jwt',
+        maxTokenAge: '5 minutes',
+      });
+    } catch (error) {
+      verify = String(error);
+    }
+
+    const response = await post(token);
+
+    expect({
+      node: process.version,
+      clientId: config.get('OIDC_CLIENT_ID'),
+      issuer: discovery.issuerUrl,
+      header: Buffer.from(token.split('.')[0]!, 'base64url').toString(),
+      claims: Buffer.from(token.split('.')[1]!, 'base64url').toString(),
+      verify,
+      status: response.status,
+      body: response.body,
+    }).toBe('diagnostic output above');
+  });
+
   it('ends the one session the provider named', async () => {
     await createSession(app, prisma, account, 'sid-phone');
     await createSession(app, prisma, account, 'sid-desktop');

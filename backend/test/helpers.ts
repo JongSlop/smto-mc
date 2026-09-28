@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { API_TOKEN_PREFIX, type ApiTokenScope } from '@smto/mc-contracts';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
@@ -12,8 +12,18 @@ export interface TestContext {
   prisma: PrismaService;
 }
 
-export async function createTestApp(): Promise<TestContext> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+/**
+ * Boots the real application against the real database.
+ *
+ * `configure` is for the rare provider that cannot be exercised as itself,
+ * such as the one that fetches the account system's signing keys over the
+ * network. Everything else runs as it does in production on purpose.
+ */
+export async function createTestApp(
+  configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
+): Promise<TestContext> {
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+  const moduleRef = await (configure ? configure(builder) : builder).compile();
 
   const app = moduleRef.createNestApplication();
   app.set('trust proxy', 1);

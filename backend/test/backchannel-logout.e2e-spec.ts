@@ -1,7 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { OidcDiscoveryService } from '../src/auth/oidc-discovery.service';
 import { PrismaService } from '../src/database/prisma.service';
 import { createAccount, createSession, createTestApp, resetDatabase } from './helpers';
 
@@ -14,9 +15,10 @@ const EVENT = 'http://schemas.openid.net/event/backchannel-logout';
  * The account system telling us a person signed out.
  *
  * Everything here turns on the token, so the suite signs real ones with a key
- * pair of its own and serves them through a stubbed discovery document. That
- * is the whole provider as far as this endpoint is concerned: a set of keys
- * and an issuer.
+ * pair of its own and hands the application that key set directly, by
+ * replacing the one service whose whole job is fetching it over the network.
+ * As far as this endpoint is concerned the provider is an issuer and a set of
+ * keys, and those are exactly what is substituted.
  */
 describe('POST /api/v1/auth/backchannel-logout', () => {
   let app: INestApplication;
@@ -29,7 +31,7 @@ describe('POST /api/v1/auth/backchannel-logout', () => {
   let account: string;
 
   beforeAll(async () => {
-    const { generateKeyPair, exportJWK, SignJWT } = await import('jose');
+    const { generateKeyPair, exportJWK, createLocalJWKSet, SignJWT } = await import('jose');
     sign = SignJWT;
 
     const pair = await generateKeyPair('RS256', { extractable: true });
@@ -38,38 +40,28 @@ describe('POST /api/v1/auth/backchannel-logout', () => {
     otherKey = impostor.privateKey;
 
     const jwk = { ...(await exportJWK(pair.publicKey)), kid: 'test-key', alg: 'RS256' };
+    const keys = createLocalJWKSet({ keys: [jwk] });
 
-    // The provider, reduced to what this endpoint reads from it. jose fetches
-    // the key set through the same global, so one stub serves both.
-    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
-      const url = String(input instanceof Request ? input.url : input);
-
-      if (url.includes('/.well-known/openid-configuration')) {
-        return Response.json({
+    // The provider, reduced to what this endpoint reads from it: an issuer and
+    // a key set. Substituted as a provider rather than by stubbing fetch, so
+    // the test depends on nothing about how or when the keys are fetched.
+    ({ app, prisma } = await createTestApp((builder) =>
+      builder.overrideProvider(OidcDiscoveryService).useValue({
+        issuerUrl: ISSUER,
+        keys: async () => keys,
+        metadata: async () => ({
           issuer: ISSUER,
           authorization_endpoint: `${ISSUER}/auth`,
           token_endpoint: `${ISSUER}/token`,
           userinfo_endpoint: `${ISSUER}/me`,
           jwks_uri: JWKS_URI,
-        });
-      }
-
-      if (url === JWKS_URI) {
-        return Response.json({ keys: [jwk] });
-      }
-
-      throw new Error(`unexpected fetch to ${url}`);
-    });
-
-    ({ app, prisma } = await createTestApp());
+        }),
+      }),
+    ));
   });
 
   afterAll(async () => {
     await app.close();
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
   });
 
   beforeEach(async () => {

@@ -8,7 +8,6 @@ import { createAccount, createSession, createTestApp, resetDatabase } from './he
 
 const ISSUER = 'https://smto.dev/account/oauth';
 const JWKS_URI = `${ISSUER}/jwks`;
-const CLIENT_ID = 'smto-mc-link-test';
 const EVENT = 'http://schemas.openid.net/event/backchannel-logout';
 
 /**
@@ -28,6 +27,18 @@ describe('POST /api/v1/auth/backchannel-logout', () => {
   let otherKey: CryptoKey;
   let sign: typeof import('jose').SignJWT;
 
+  /**
+   * Who the provider thinks it is talking to, read from the running
+   * application rather than assumed.
+   *
+   * Not a detail: a logout token names its client in `aud`, and the client id
+   * comes from the environment. CI sets a different one, so a hardcoded
+   * audience here passed locally and refused every token there, with the
+   * refusal cases still green because they expect a 400 and got one for the
+   * wrong reason.
+   */
+  let clientId: string;
+
   let account: string;
 
   beforeAll(async () => {
@@ -45,6 +56,8 @@ describe('POST /api/v1/auth/backchannel-logout', () => {
     // The provider, reduced to what this endpoint reads from it: an issuer and
     // a key set. Substituted as a provider rather than by stubbing fetch, so
     // the test depends on nothing about how or when the keys are fetched.
+    const { ConfigService } = await import('@nestjs/config');
+
     ({ app, prisma } = await createTestApp((builder) =>
       builder.overrideProvider(OidcDiscoveryService).useValue({
         issuerUrl: ISSUER,
@@ -58,6 +71,8 @@ describe('POST /api/v1/auth/backchannel-logout', () => {
         }),
       }),
     ));
+
+    clientId = app.get(ConfigService).get('OIDC_CLIENT_ID') as string;
   });
 
   afterAll(async () => {
@@ -92,7 +107,7 @@ describe('POST /api/v1/auth/backchannel-logout', () => {
     const token = new sign(claims)
       .setProtectedHeader({ alg: 'RS256', kid: 'test-key', typ: options.typ ?? 'logout+jwt' })
       .setIssuer(ISSUER)
-      .setAudience(options.audience ?? CLIENT_ID)
+      .setAudience(options.audience ?? clientId)
       .setIssuedAt()
       .setExpirationTime('2m');
 
@@ -109,43 +124,6 @@ describe('POST /api/v1/auth/backchannel-logout', () => {
       .type('form')
       .send({ logout_token: token });
   }
-
-  // Temporary diagnostic: CI rejects tokens this machine accepts, with the same
-  // code and the same jose build. Fails on purpose so the values reach the log,
-  // since vitest swallows console output from a passing test.
-  it('diagnostic', async () => {
-    const { ConfigService } = await import('@nestjs/config');
-    const { jwtVerify } = await import('jose');
-
-    const config = app.get(ConfigService);
-    const discovery = app.get(OidcDiscoveryService);
-    const token = await logoutToken({ sid: 'sid-phone' });
-
-    let verify = 'OK';
-    try {
-      await jwtVerify(token, await discovery.keys(), {
-        issuer: discovery.issuerUrl,
-        audience: config.get('OIDC_CLIENT_ID') as string,
-        typ: 'logout+jwt',
-        maxTokenAge: '5 minutes',
-      });
-    } catch (error) {
-      verify = String(error);
-    }
-
-    const response = await post(token);
-
-    expect({
-      node: process.version,
-      clientId: config.get('OIDC_CLIENT_ID'),
-      issuer: discovery.issuerUrl,
-      header: Buffer.from(token.split('.')[0]!, 'base64url').toString(),
-      claims: Buffer.from(token.split('.')[1]!, 'base64url').toString(),
-      verify,
-      status: response.status,
-      body: response.body,
-    }).toBe('diagnostic output above');
-  });
 
   it('ends the one session the provider named', async () => {
     await createSession(app, prisma, account, 'sid-phone');
@@ -224,7 +202,10 @@ describe('POST /api/v1/auth/backchannel-logout', () => {
     ],
     ['a token with no logout event', (): Promise<string> => logoutToken({ events: {} })],
     ['a token carrying a nonce', (): Promise<string> => logoutToken({ nonce: 'anything' })],
-    ['a token for another client', (): Promise<string> => logoutToken({ audience: 'roundcube' })],
+    [
+      'a token for another client',
+      (): Promise<string> => logoutToken({ audience: `${clientId}-somebody-else` }),
+    ],
     ['a token signed by somebody else', (): Promise<string> => logoutToken({ key: otherKey })],
     ['a plain JWT rather than a logout token', (): Promise<string> => logoutToken({ typ: 'JWT' })],
     [

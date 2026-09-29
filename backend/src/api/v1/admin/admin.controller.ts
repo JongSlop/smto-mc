@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -19,6 +20,7 @@ import {
   auditQuerySchema,
   createApiTokenSchema,
   createServerSchema,
+  mcUuidSchema,
   updateServerSchema,
   type ApiToken,
   type ApiTokenWithSecret,
@@ -40,6 +42,7 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodBody, ZodQuery } from '../../../common/pipes/zod.decorators';
 import type { RequestUser } from '../../../common/types/request-user';
+import { ProfileMessageService } from '../../../profiles/profile-message.service';
 import { ServersService } from '../../../servers/servers.service';
 import { TokensService } from '../../../tokens/tokens.service';
 
@@ -60,6 +63,7 @@ export class AdminController {
     private readonly assets: AssetsService,
     private readonly tokens: TokensService,
     private readonly audit: AuditService,
+    private readonly profileMessages: ProfileMessageService,
   ) {}
 
   // --- servers ---
@@ -104,6 +108,35 @@ export class AdminController {
     @ClientIp() ipAddress?: string,
   ): Promise<void> {
     return this.servers.remove(id, { accountId: user.id, ipAddress });
+  }
+
+  // --- players ---
+
+  /**
+   * Takes down the speech bubble on somebody's page.
+   *
+   * By Minecraft UUID, because that is what the page is addressed by and what
+   * the admin is looking at. The text that was removed goes into the audit log,
+   * since it is the only place it survives.
+   */
+  @Delete('players/:uuid/message')
+  @HttpCode(204)
+  @ApiOperation({ summary: "Remove the message shown on a player's profile" })
+  clearMessage(
+    @Param('uuid') uuid: string,
+    @CurrentUser() user: RequestUser,
+    @ClientIp() ipAddress?: string,
+  ): Promise<void> {
+    const parsed = mcUuidSchema.safeParse(uuid);
+
+    if (!parsed.success) {
+      throw new NotFoundException('profile_not_found');
+    }
+
+    return this.profileMessages.clearForProfile(parsed.data, {
+      accountId: user.id!,
+      ipAddress,
+    });
   }
 
   // --- server assets ---

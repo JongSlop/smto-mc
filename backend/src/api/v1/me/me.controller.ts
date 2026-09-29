@@ -6,11 +6,19 @@ import {
   Get,
   HttpCode,
   Post,
+  Put,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
-import type { Account, LinkCodeIssued, Me, MinecraftLink } from '@smto/mc-contracts';
+import {
+  setProfileMessageSchema,
+  type Account,
+  type LinkCodeIssued,
+  type Me,
+  type MinecraftLink,
+  type SetProfileMessageInput,
+} from '@smto/mc-contracts';
 
 import { ClientIp } from '../../../common/decorators/client-ip.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -21,6 +29,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { LinkCodeService } from '../../../linking/code/link-code.service';
 import { LinkingService } from '../../../linking/linking.service';
 import { MsaLinkService } from '../../../linking/msa/msa-link.service';
+import { ProfileMessageService } from '../../../profiles/profile-message.service';
 import { StatsService } from '../../../stats/stats.service';
 
 const msaCallbackSchema = z.object({
@@ -44,6 +53,7 @@ export class MeController {
     private readonly linkCodes: LinkCodeService,
     private readonly msa: MsaLinkService,
     private readonly stats: StatsService,
+    private readonly profileMessage: ProfileMessageService,
   ) {}
 
   /** The whole dashboard in one response: who you are, your link, your stats. */
@@ -164,6 +174,25 @@ export class MeController {
   ): Promise<MinecraftLink> {
     const { accountId, verification } = await this.msa.complete(body.state, body.code);
     return this.linking.link(accountId, verification, { ipAddress });
+  }
+
+  /**
+   * The speech bubble on the caller's own page. An empty message removes it.
+   *
+   * A PUT because it replaces the one value and can be repeated harmlessly.
+   * Throttled well below what a person editing a sentence would reach, since
+   * this is text other people read and there is no reason to allow it in a loop.
+   */
+  @Put('message')
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @ApiOperation({ summary: 'Set or remove the message shown on your profile' })
+  async setMessage(
+    @CurrentUser() user: RequestUser,
+    @ZodBody(setProfileMessageSchema) body: SetProfileMessageInput,
+  ): Promise<{ message: string | null }> {
+    this.assertPerson(user);
+
+    return { message: await this.profileMessage.set(user.id!, body.message) };
   }
 
   @Delete('link')

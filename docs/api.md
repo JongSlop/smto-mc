@@ -375,6 +375,7 @@ This is the page behind a leaderboard row on the website.
   "mcUuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
   "mcUsername": "Notch",
   "linkedSince": "2026-03-04T00:00:00.000Z",
+  "message": "Come and see my farm",
   "stats": {
     "totalPlaytimeSeconds": 208800,
     "totals": { "playtime_seconds": 208800, "deaths": 15 },
@@ -392,6 +393,10 @@ This is the page behind a leaderboard row on the website.
   }
 }
 ```
+
+`message` is the speech bubble the player wrote for their page, or `null`. It is
+plain text: a single line of at most 80 characters, already cleaned up, and
+never HTML. Whoever renders it has to escape it like any other user text.
 
 There is no server filter parameter. `servers` already carries one entry per
 server the player has data on, so narrowing to one is a lookup on your side, and
@@ -459,6 +464,7 @@ Browser session with the `admin` role. Not reachable with an `X-Api-Key`.
 GET    /admin/servers/{id}/assets                   what is uploaded for this server
 POST   /admin/servers/{id}/assets?filename=icon.png the file as the raw body
 DELETE /admin/servers/{id}/assets/{assetId}
+DELETE /admin/players/{uuid}/message                remove the message on a player's profile
 ```
 
 The upload is the file itself, not multipart: the `Content-Type` header is the

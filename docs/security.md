@@ -197,6 +197,37 @@ Two rules keep the page from becoming a way to learn things it should not:
   server with `isPublic` off is one nobody was meant to see, and its numbers
   showing up inside a total would tell them it exists.
 
+## The speech bubble
+
+The one thing on the site that a player writes and strangers read, so it gets
+the care the rest of the data does not need.
+
+- **Text only, one line, 80 characters.** No markup and no formatting, so there
+  is nothing to render badly. It is escaped by Svelte on the way out and is
+  never inserted as HTML anywhere.
+- **Cleaned on the way in, so the stored text is the shown text.** Newlines and
+  control characters become spaces and runs of whitespace collapse. Invisible
+  format characters are removed: the bidirectional overrides can make a line
+  read backwards, and zero width characters can pad a message with nothing. The
+  zero width joiner is kept, since emoji sequences depend on it. The limit is
+  counted in characters a person would count, not bytes.
+- **Only the owner writes it,** through `PUT /me/message`, which acts on the
+  caller's own account and takes no target. A plugin token has no account and is
+  refused. It needs a live link, since there would be no page to show it on, and
+  it is throttled to 20 a minute.
+- **Admins can take it down,** with `DELETE /admin/players/{uuid}/message`. The
+  text that was removed is written to the audit log as `profile_message_cleared`,
+  because once it is gone that is the only record of what was said. Removing
+  nothing logs nothing.
+- **It lives on the account,** so it survives an unlink and comes back on a
+  relink, but is not visible while there is no live link: the page does not
+  exist then.
+
+What is not there: nothing stops a player writing a new message straight after
+an admin removed one, and there is no report button or word filter. If that
+becomes a problem the next step is a per-account block that the save refuses,
+not a longer blocklist.
+
 ## The API surface
 
 Guards run globally in this order: throttler, authenticate, roles, scopes.

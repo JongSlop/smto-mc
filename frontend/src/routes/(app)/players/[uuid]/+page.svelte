@@ -1,21 +1,37 @@
 <script lang="ts">
+  import { PROFILE_MESSAGE_MAX } from '@smto/mc-contracts';
+  import Alert from '$lib/components/Alert.svelte';
+  import Button from '$lib/components/Button.svelte';
   import Card from '$lib/components/Card.svelte';
   import ServerFilter, { type FilterServer } from '$lib/components/ServerFilter.svelte';
   import SkinViewer from '$lib/components/SkinViewer.svelte';
+  import SpeechBubble from '$lib/components/SpeechBubble.svelte';
   import StatsPanel from '$lib/components/StatsPanel.svelte';
   // `base` alongside `resolve` on purpose: resolve() only knows this app's
   // routes, and the skin proxy is an API path behind the same prefix.
+  import { enhance } from '$app/forms';
   import { base, resolve } from '$app/paths';
   import { formatDateShort, formatDateTime } from '$lib/format';
-  import { translate } from '$lib/i18n';
+  import { errorMessage, translate } from '$lib/i18n';
   import { hasRecordedValue, type MetricValue } from '$lib/metrics';
-  import type { PageData } from './$types';
+  import type { ActionData, PageData } from './$types';
 
-  let { data }: { data: PageData } = $props();
+  let { data, form }: { data: PageData; form: ActionData } = $props();
 
   const t = $derived(translate(data.lang));
   const profile = $derived(data.profile);
   const servers = $derived(profile.stats.servers);
+
+  /**
+   * What is in the box while the owner types.
+   *
+   * Derived from the saved message so it follows the page: after a save the
+   * field shows the text as it was stored, cleaned up, and not as it was typed.
+   * Assignable, which is what lets the input bind to it.
+   */
+  let draft = $derived(profile.message ?? '');
+  const draftLength = $derived([...draft].length);
+  const tooLong = $derived(draftLength > PROFILE_MESSAGE_MAX);
 
   const page = $derived(resolve('/(app)/players/[uuid]', { uuid: profile.mcUuid }));
   const skinUrl = $derived(`${base}/api/v1/public/skins/${profile.mcUuid}.png`);
@@ -71,7 +87,70 @@
 
 <div class="profile">
   <Card>
-    <SkinViewer {skinUrl} username={profile.mcUsername} />
+    <!--
+      The bubble comes out of the head of the character, so it sits directly
+      above the viewer and the viewer is pulled up under its tail. Visitors see
+      it only when there is something to say. The owner always sees a box to
+      write in, because an empty one is the only way to find out there is one.
+    -->
+    {#if data.isOwn}
+      <SpeechBubble>
+        <form method="POST" action="?/save" use:enhance class="editor">
+          <label class="visually-hidden" for="profile-message">{t.bubble_label()}</label>
+          <!--
+            A few lines rather than one, so an eighty character message is
+            all on screen while it is being written. Enter sends it, as it
+            would in a one line field; without JavaScript it adds a line
+            break, which is cleaned up to a space on the way in.
+          -->
+          <textarea
+            id="profile-message"
+            name="message"
+            rows="4"
+            autocomplete="off"
+            bind:value={draft}
+            placeholder={t.bubble_placeholder()}
+            aria-invalid={tooLong}
+            onkeydown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}></textarea>
+          <span class="count" class:over={tooLong}>{draftLength}/{PROFILE_MESSAGE_MAX}</span>
+          <div class="editor-buttons">
+            {#if profile.message}
+              <Button variant="secondary" formaction="?/remove">{t.bubble_remove()}</Button>
+            {/if}
+            <Button>{t.bubble_save()}</Button>
+          </div>
+        </form>
+      </SpeechBubble>
+    {:else if profile.message}
+      <SpeechBubble>{profile.message}</SpeechBubble>
+    {/if}
+
+    <div class="stage" class:under-bubble={data.isOwn || profile.message}>
+      <SkinViewer {skinUrl} username={profile.mcUsername} />
+    </div>
+
+    {#if form?.error}
+      <Alert variant="error">{errorMessage(t, form.error)}</Alert>
+    {:else if form?.saved}
+      <Alert variant="success">{t.bubble_saved()}</Alert>
+    {:else if form?.removed}
+      <Alert variant="success">{t.bubble_removed()}</Alert>
+    {:else if form?.moderated}
+      <Alert variant="success">{t.bubble_moderated()}</Alert>
+    {/if}
+
+    {#if data.isOwn}
+      <p class="hint">{t.bubble_hint()}</p>
+    {:else if data.canModerate && profile.message}
+      <form method="POST" action="?/moderate" use:enhance>
+        <Button variant="danger" wide>{t.bubble_moderate()}</Button>
+      </form>
+    {/if}
 
     <dl class="facts">
       <div>
@@ -142,6 +221,72 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
+  }
+
+  /* Pulled up under the bubble's tail, into the blank space above the
+     character's head, so the tail points at the head rather than at a gap. */
+  .under-bubble {
+    margin-top: calc(-1 * var(--space-4));
+  }
+
+  .editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .editor textarea {
+    width: 100%;
+    padding: var(--space-2);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    text-align: center;
+    resize: none;
+  }
+
+  .editor textarea:focus-visible {
+    border-color: var(--accent);
+    outline: none;
+  }
+
+  .editor textarea[aria-invalid='true'] {
+    border-color: var(--danger);
+  }
+
+  /* One or two buttons sharing the width, so a label is never squeezed onto a
+     second line however narrow the card gets. */
+  .editor-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .editor-buttons :global(button) {
+    width: 100%;
+    padding-inline: var(--space-2);
+    white-space: nowrap;
+  }
+
+  .count {
+    align-self: flex-end;
+    color: var(--fg-muted);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .count.over {
+    color: var(--danger);
+    font-weight: 700;
+  }
+
+  .hint {
+    margin: 0;
+    color: var(--fg-muted);
+    font-size: var(--text-xs);
+    text-align: center;
   }
 
   .facts {

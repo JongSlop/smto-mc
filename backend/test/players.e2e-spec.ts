@@ -96,6 +96,7 @@ describe('GET /api/v1/players/:uuid', () => {
       'linkedSince',
       'mcUsername',
       'mcUuid',
+      'message',
       'stats',
     ]);
   });

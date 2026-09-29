@@ -48,6 +48,11 @@ model Account {
   username       String    @map("username_cache")
   avatarUrl      String?   @map("avatar_url_cache")
   roles          String[]  @map("roles_cache")
+  /// The speech bubble on the player's page. Written by the person, so unlike
+  /// the columns above it is not a cache of anything and login never touches it.
+  /// Kept on the account rather than the link, so it survives an unlink and a
+  /// relink, and is already normalised when it gets here.
+  profileMessage String?   @map("profile_message")
   lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz(3)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)

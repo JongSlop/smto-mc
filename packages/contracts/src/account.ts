@@ -53,6 +53,7 @@ export const AUDIT_ACTIONS = [
   'session_ended_by_provider',
   'metric_rejected',
   'uploader_session_issued',
+  'profile_message_cleared',
 ] as const;
 export const auditActionSchema = z.enum(AUDIT_ACTIONS);
 export type AuditAction = z.infer<typeof auditActionSchema>;

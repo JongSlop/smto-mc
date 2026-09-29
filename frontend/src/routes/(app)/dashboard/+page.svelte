@@ -41,6 +41,16 @@
         <SkinViewer {skinUrl} username={link.mcUsername} />
       {/if}
       <p class="username">{link.mcUsername}</p>
+      <!--
+        The way to your own public page, and so to the box for the speech
+        bubble. Without it that page is reachable only if you happen to be in a
+        top ten, which is no way to find a thing you are meant to edit.
+      -->
+      <p class="public">
+        <a href={resolve('/(app)/players/[uuid]', { uuid: link.mcUuid })}>
+          {t.dashboard_publicPage()}
+        </a>
+      </p>
 
       <!--
         Context rather than achievement. These two say who this profile is and
@@ -112,6 +122,12 @@
   .username {
     font-family: var(--font-display);
     font-size: var(--text-lg);
+    text-align: center;
+  }
+
+  .public {
+    margin: 0;
+    font-size: var(--text-sm);
     text-align: center;
   }
 

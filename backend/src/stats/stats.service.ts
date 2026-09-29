@@ -251,7 +251,12 @@ export class StatsService {
   async profile(mcUuid: string): Promise<PlayerProfile | null> {
     const link = await this.prisma.minecraftLink.findFirst({
       where: { mcUuid, unlinkedAt: null },
-      select: { mcUuid: true, mcUsername: true, verifiedAt: true },
+      select: {
+        mcUuid: true,
+        mcUsername: true,
+        verifiedAt: true,
+        account: { select: { profileMessage: true } },
+      },
     });
 
     if (!link) {
@@ -262,6 +267,7 @@ export class StatsService {
       mcUuid: link.mcUuid,
       mcUsername: link.mcUsername,
       linkedSince: link.verifiedAt.toISOString(),
+      message: link.account.profileMessage,
       stats: await this.forProfile(link.mcUuid, { publicOnly: true }),
     };
   }

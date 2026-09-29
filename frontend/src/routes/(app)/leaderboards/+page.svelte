@@ -2,6 +2,7 @@
   import Card from '$lib/components/Card.svelte';
   import MetricIcon from '$lib/components/MetricIcon.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import ServerFilter from '$lib/components/ServerFilter.svelte';
   import { resolve } from '$app/paths';
   import { translate } from '$lib/i18n';
   import { formatMetric, metricLabel } from '$lib/metrics';
@@ -11,6 +12,32 @@
 
   const t = $derived(translate(data.lang));
   const page = $derived(resolve('/(app)/leaderboards'));
+
+  /**
+   * This page's address with a tab and a server on it.
+   *
+   * Both live in the query string and each control has to keep the other's
+   * choice: switching tab must not drop the server, and switching server must
+   * not drop the tab. Either is left off when it is the default, so the plain
+   * address stays the plain address.
+   */
+  function address(choice: { metric?: string | null; server?: string | null }): string {
+    const query: string[] = [];
+
+    if (choice.metric) query.push(`metric=${encodeURIComponent(choice.metric)}`);
+    if (choice.server) query.push(`server=${encodeURIComponent(choice.server)}`);
+
+    return query.length > 0 ? `${page}?${query.join('&')}` : page;
+  }
+
+  /**
+   * The name of the server in the scope line. From the layout's list of every
+   * public server rather than from the ones with a ranking, so a server nobody
+   * has played yet still reads as its name and not as its id.
+   */
+  const serverName = $derived(
+    data.servers.find((entry) => entry.id === data.server)?.name ?? data.server,
+  );
 </script>
 
 <svelte:head>
@@ -20,9 +47,29 @@
 <h1>{t.leaderboards_heading()}</h1>
 <p class="intro">{t.leaderboards_intro()}</p>
 
+<ServerFilter
+  servers={data.boardServers}
+  selected={data.server}
+  hrefFor={(id) => address({ metric: data.board?.metric, server: id })}
+/>
+
+{#if data.server}
+  <p class="scope">{t.leaderboards_scopeServer({ server: serverName ?? '' })}</p>
+{/if}
+
 {#if !data.board}
-  <Card title={t.leaderboards_emptyHeading()} description={t.leaderboards_emptyBody()}>
-    <span></span>
+  <Card
+    title={t.leaderboards_emptyHeading()}
+    description={data.server
+      ? t.leaderboards_emptyOnServer({ server: serverName ?? '' })
+      : t.leaderboards_emptyBody()}
+  >
+    {#if data.server}
+      <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+      <a href={address({})}>{t.serverFilter_all()}</a>
+    {:else}
+      <span></span>
+    {/if}
   </Card>
 {:else}
   <!--
@@ -31,15 +78,15 @@
     somebody, and the page still works with JavaScript off.
   -->
   <!--
-    The query string is this page's own address with a parameter on it, so
-    there is no route for resolve() to resolve and the rule has nothing to
-    check. The path itself is resolved, in the script above.
+    The address is this page's own path with parameters on it, built by
+    address() above from the path resolve() gave us, so there is no route here
+    for the rule to check.
   -->
   <!-- eslint-disable svelte/no-navigation-without-resolve -->
   <nav class="tabs" aria-label={t.leaderboards_heading()}>
     {#each data.metrics as metric (metric)}
       <a
-        href="{page}?metric={encodeURIComponent(metric)}"
+        href={address({ metric, server: data.server })}
         aria-current={metric === data.board.metric ? 'page' : undefined}
       >
         <MetricIcon {metric} size={16} />
@@ -59,10 +106,16 @@
       {#each data.board.entries as entry (entry.mcUuid)}
         <!-- Marked rather than moved: the reader stays where they placed. -->
         <li class:you={entry.mcUuid === data.mcUuid}>
-          <span class="rank">{entry.rank}</span>
-          <PlayerFace mcUuid={entry.mcUuid} size={40} />
-          <span class="name">{entry.mcUsername}</span>
-          <span class="value">{formatMetric(entry.value, data.board.metric, data.lang)}</span>
+          <!--
+            The whole row is the link, so the target is as big as the row and a
+            phone does not need a thumb on the name specifically.
+          -->
+          <a href={resolve('/(app)/players/[uuid]', { uuid: entry.mcUuid })}>
+            <span class="rank">{entry.rank}</span>
+            <PlayerFace mcUuid={entry.mcUuid} size={40} />
+            <span class="name">{entry.mcUsername}</span>
+            <span class="value">{formatMetric(entry.value, data.board.metric, data.lang)}</span>
+          </a>
         </li>
       {/each}
     </ol>
@@ -83,6 +136,12 @@
 
   .intro {
     max-width: 70ch;
+    color: var(--fg-muted);
+    font-size: var(--text-sm);
+  }
+
+  .scope {
+    margin: 0;
     color: var(--fg-muted);
     font-size: var(--text-sm);
   }
@@ -133,12 +192,31 @@
   }
 
   li {
+    border-bottom: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  li a {
     display: flex;
     align-items: center;
     gap: var(--space-4);
     padding: var(--space-3);
-    border-bottom: 1px solid var(--border);
     border-radius: var(--radius-sm);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  li a:hover {
+    background: var(--bg-sunken);
+  }
+
+  li a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .you a:hover {
+    background: var(--accent-subtle);
   }
 
   li:last-child {
@@ -177,7 +255,7 @@
   }
 
   @media (max-width: 34rem) {
-    li {
+    li a {
       gap: var(--space-3);
     }
 

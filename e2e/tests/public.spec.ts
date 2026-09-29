@@ -70,10 +70,26 @@ test.describe('anonymous', () => {
     await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
   });
 
+  test('a leaderboard server filter is an address too', async ({ page }) => {
+    // Signed out this redirects as well. The narrowed view itself is covered by
+    // the backend suite, which is where the ranking rules live.
+    await page.goto(`${APP}/leaderboards?metric=deaths&server=i5`);
+
+    await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
+  });
+
   test('the leaderboards need a session', async ({ page }) => {
     // The boards pair a name with someone's playtime, so they sit behind a
     // credential rather than on the open web.
     await page.goto(`${APP}/leaderboards`);
+
+    await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
+  });
+
+  test('a player page needs a session, with or without a server filter', async ({ page }) => {
+    // A profile pairs a name with everything somebody has done, so it sits
+    // behind the same credential as the boards that link to it.
+    await page.goto(`${APP}/players/069a79f4-44e9-4726-a5be-fca90e38aaf5?server=i5`);
 
     await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
   });

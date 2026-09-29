@@ -7,6 +7,7 @@ import {
   type IngestMetricsInput,
   type IngestResult,
   type Leaderboards,
+  type PlayerProfile,
   type PlayerStats,
   type ServerStats,
 } from '@smto/mc-contracts';
@@ -160,13 +161,16 @@ export class StatsService {
    * zero: never having played somewhere is not the same as having played there
    * for no time.
    */
-  async forProfile(mcUuid: string | null): Promise<PlayerStats> {
+  async forProfile(
+    mcUuid: string | null,
+    options: { publicOnly?: boolean } = {},
+  ): Promise<PlayerStats> {
     if (!mcUuid) {
       return { totalPlaytimeSeconds: 0, totals: {}, servers: [] };
     }
 
     const rows = await this.prisma.playerMetric.findMany({
-      where: { mcUuid },
+      where: { mcUuid, ...(options.publicOnly ? { server: { isPublic: true } } : {}) },
       include: {
         server: { select: { id: true, name: true, iconUrl: true, state: true, sortOrder: true } },
       },
@@ -234,7 +238,37 @@ export class StatsService {
   }
 
   /**
-   * The top players for each featured metric, summed across every server.
+   * A profile as somebody else sees it, or null where there is nothing to see.
+   *
+   * A page exists only for a UUID with a live link. Metric rows alone are not
+   * enough: without a link there is no display name to put on it, and more to
+   * the point, unlinking is how a player stops having a page. Answering for any
+   * UUID that has rows would make that switch do nothing.
+   *
+   * Public servers only, the same rule the leaderboard follows, so the totals
+   * on a page and the reading on the board beside it are the same number.
+   */
+  async profile(mcUuid: string): Promise<PlayerProfile | null> {
+    const link = await this.prisma.minecraftLink.findFirst({
+      where: { mcUuid, unlinkedAt: null },
+      select: { mcUuid: true, mcUsername: true, verifiedAt: true },
+    });
+
+    if (!link) {
+      return null;
+    }
+
+    return {
+      mcUuid: link.mcUuid,
+      mcUsername: link.mcUsername,
+      linkedSince: link.verifiedAt.toISOString(),
+      stats: await this.forProfile(link.mcUuid, { publicOnly: true }),
+    };
+  }
+
+  /**
+   * The top players for each featured metric, summed across every server, or
+   * counted on one when `serverId` is given.
    *
    * Linked profiles only, and that is a data limit rather than a policy: the
    * metric rows carry a UUID, and the display name for one exists only where
@@ -244,11 +278,24 @@ export class StatsService {
    * One query for every board. Ranking nine metrics with nine round trips
    * would be nine sequential scans of the same table, so the window function
    * partitions by metric and the whole thing comes back at once.
+   *
+   * Narrowing to one server changes what is summed and nothing else, so the
+   * ranking rules are the same and a player's row reads the same number as the
+   * per-server figure on their profile. A server that is unknown or not public
+   * is the caller's to refuse before getting here: asking for it would
+   * otherwise return empty boards, which says the server exists.
    */
-  async leaderboards(limit: number = LEADERBOARD_SIZE): Promise<Leaderboards> {
+  async leaderboards(
+    options: { limit?: number; serverId?: string | null } = {},
+  ): Promise<Leaderboards> {
+    const limit = options.limit ?? LEADERBOARD_SIZE;
+    const serverId = options.serverId ?? null;
+
     if (FEATURED_METRICS.length === 0) {
-      return { boards: [] };
+      return { server: serverId, servers: [], boards: [] };
     }
+
+    const onServer = serverId === null ? Prisma.empty : Prisma.sql`AND pm.server_id = ${serverId}`;
 
     const rows = await this.prisma.$queryRaw<
       { metric: string; mcUuid: string; mcUsername: string; total: bigint; rank: bigint }[]
@@ -268,11 +315,17 @@ export class StatsService {
         JOIN minecraft_links l
           ON l.mc_uuid = pm.mc_uuid
           AND l.unlinked_at IS NULL
+        JOIN servers s
+          ON s.id = pm.server_id
+          -- A hidden server is one nobody was meant to see, and its numbers
+          -- stay out of the sums for the same reason a profile leaves it out.
+          AND s.is_public
         WHERE pm.metric IN (${Prisma.join([...FEATURED_METRICS])})
           AND pm.value_num IS NOT NULL
           -- Nobody is on a board for never having done the thing, the same
           -- rule the lists on the dashboard follow.
           AND pm.value_num > 0
+          ${onServer}
         GROUP BY pm.metric, pm.mc_uuid, l.mc_username_cache
       ) ranked
       WHERE rank <= ${limit}
@@ -296,10 +349,54 @@ export class StatsService {
     // reads the same way as the dashboard above it. A metric nobody has moved
     // yet is left out rather than shown as an empty table.
     return {
+      server: serverId,
+      servers: await this.serversOnBoards(),
       boards: FEATURED_METRICS.filter((metric) => byMetric.has(metric)).map((metric) => ({
         metric,
         entries: byMetric.get(metric) ?? [],
       })),
     };
+  }
+
+  /** Whether a server can be asked about: it exists and is meant to be seen. */
+  async isPublicServer(serverId: string): Promise<boolean> {
+    const server = await this.prisma.server.findFirst({
+      where: { id: serverId, isPublic: true },
+      select: { id: true },
+    });
+
+    return server !== null;
+  }
+
+  /**
+   * The public servers that have somebody on a board.
+   *
+   * Independent of which server is being looked at, so the choices do not
+   * change under the person choosing, and limited to servers that would show
+   * something, so nobody is offered a filter that leads to an empty page. The
+   * same eligibility rules as the boards: a live link, a featured metric, and a
+   * value above zero.
+   */
+  private async serversOnBoards(): Promise<Leaderboards['servers']> {
+    const rows = await this.prisma.$queryRaw<
+      { id: string; name: string; iconUrl: string | null; state: string }[]
+    >`
+      SELECT s.id, s.name, s.icon_url AS "iconUrl", s.state::text AS state
+      FROM servers s
+      WHERE s.is_public
+        AND EXISTS (
+          SELECT 1
+          FROM player_metrics pm
+          JOIN minecraft_links l
+            ON l.mc_uuid = pm.mc_uuid
+            AND l.unlinked_at IS NULL
+          WHERE pm.server_id = s.id
+            AND pm.metric IN (${Prisma.join([...FEATURED_METRICS])})
+            AND pm.value_num > 0
+        )
+      ORDER BY s.sort_order, s.id
+    `;
+
+    return rows;
   }
 }

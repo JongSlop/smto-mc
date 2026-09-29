@@ -326,6 +326,8 @@ Returns the top ten for every featured metric, summed across all servers:
 
 ```json
 {
+  "server": null,
+  "servers": [{ "id": "i5", "name": "Laced Pack", "iconUrl": null, "state": "ONGOING" }],
   "boards": [
     {
       "metric": "playtime_seconds",
@@ -335,6 +337,18 @@ Returns the top ten for every featured metric, summed across all servers:
 }
 ```
 
+**`?server=i5`** counts only what was recorded on that server, so the ten on the
+board are the ten best there rather than the network's ten with the rest cut
+away. `server` in the response echoes the choice, and is `null` for the whole
+network. A server that does not exist, is not public, or is not a valid id
+returns `404 server_not_found`; all three are the same answer so a hidden server
+cannot be told from one that was never there. A public server nobody has played
+is not an error: it returns `boards: []`.
+
+`servers` lists every public server that has somebody on a board, in the order
+the admin area sets, and does not change with `?server=`. It is what the
+website's filter offers, and it leaves out servers whose boards would be empty.
+
 Three rules worth knowing before you build against it. Only profiles linked
 here appear, because the metric rows carry a UUID and the display name for one
 exists only where somebody has linked an account. A total of zero is never
@@ -342,8 +356,61 @@ ranked, the same rule the website's lists follow. Boards nobody is on are left
 out rather than returned empty, so the array is not a fixed length and you
 should look metrics up by name rather than by position.
 
+Servers that are not public are left out of every sum and out of `servers`.
+
 Throttled to 30 a minute per address. It is one grouped scan of the metric
 table, so cache it for a minute rather than calling it per player.
+
+---
+
+## `GET /players/{uuid}`
+
+`X-Api-Key` or a browser session, no scope, the same door as the leaderboards.
+This is the page behind a leaderboard row on the website.
+
+`uuid` is a Minecraft UUID, dashed or not. Returns one linked player:
+
+```json
+{
+  "mcUuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+  "mcUsername": "Notch",
+  "linkedSince": "2026-03-04T00:00:00.000Z",
+  "stats": {
+    "totalPlaytimeSeconds": 208800,
+    "totals": { "playtime_seconds": 208800, "deaths": 15 },
+    "servers": [
+      {
+        "serverId": "i5",
+        "serverName": "Laced Pack",
+        "serverIconUrl": null,
+        "serverState": "ONGOING",
+        "playtimeSeconds": 172800,
+        "metrics": { "playtime_seconds": 172800, "deaths": 12 },
+        "lastSeenAt": "2026-09-29T12:15:34.793Z"
+      }
+    ]
+  }
+}
+```
+
+There is no server filter parameter. `servers` already carries one entry per
+server the player has data on, so narrowing to one is a lookup on your side, and
+the answer stays one cacheable response per player. `totals` sums counters
+across every entry and leaves gauges out; to read a gauge, read it from the
+server it was recorded on. The website's `?server=` on the player page does
+exactly this.
+
+What it leaves out on purpose: the smto.dev account (id and username), and how
+the profile was verified. Servers that are not public are left out of `servers`
+and out of `totals`, and the leaderboards leave them out of their sums for the
+same reason, so a player's page and their board reading agree.
+
+`404 profile_not_found` for a UUID that was never linked, was unlinked since, or
+is not a UUID at all. All three get the same answer, so whether somebody once
+had a page is not something a caller can find out. Statistics survive unlinking
+(see the security notes), but the page does not.
+
+Throttled to 60 a minute per address.
 
 ---
 

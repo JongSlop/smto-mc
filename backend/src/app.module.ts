@@ -9,6 +9,7 @@ import { AdminApiModule } from './api/v1/admin/admin-api.module';
 import { AuthApiModule } from './api/v1/auth/auth-api.module';
 import { IngestApiModule } from './api/v1/ingest/ingest-api.module';
 import { LeaderboardsApiModule } from './api/v1/leaderboards/leaderboards-api.module';
+import { PlayersApiModule } from './api/v1/players/players-api.module';
 import { MeApiModule } from './api/v1/me/me-api.module';
 import { PublicApiModule } from './api/v1/public/public-api.module';
 import { AuditModule } from './audit/audit.module';
@@ -59,6 +60,7 @@ import { TokensModule } from './tokens/tokens.module';
     PublicApiModule,
     IngestApiModule,
     LeaderboardsApiModule,
+    PlayersApiModule,
     MeApiModule,
     AdminApiModule,
     MaintenanceModule,

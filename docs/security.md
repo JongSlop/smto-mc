@@ -172,6 +172,31 @@ Statistics are keyed by Minecraft UUID rather than by account, so they survive
 unlinking and come back if the same profile is linked again. Unlinking is how
 somebody stops showing a profile, not how they delete their playtime.
 
+## Who can see a player's page
+
+A player page (`GET /players/{uuid}`, and `/players/{uuid}` on the website) is
+behind a session or a plugin token, exactly like the leaderboards that link to
+it. A profile pairs a name with everything that player has done, which is more
+than a leaderboard row shows, so it would make no sense for the row to need a
+credential and the page not to. Any signed-in smto.dev account can open any
+linked profile; there is no per-player privacy setting yet. If one is wanted, it
+belongs on the account and has to be honoured by the leaderboards as well, or it
+protects nothing.
+
+What another person sees is deliberately narrow: the cached Minecraft name, the
+UUID, the date the profile was linked, and the numbers. Not the smto.dev account
+id or username, and not how the profile was verified.
+
+Two rules keep the page from becoming a way to learn things it should not:
+
+- **A page exists only while a link is live.** Statistics are keyed by UUID and
+  survive unlinking, so metric rows alone are not enough to answer. Otherwise
+  unlinking, which is how somebody stops showing a profile, would do nothing.
+  "Never linked" and "unlinked since" return the same 404.
+- **Hidden servers are left out** of a profile and of the leaderboard sums. A
+  server with `isPublic` off is one nobody was meant to see, and its numbers
+  showing up inside a total would tell them it exists.
+
 ## The API surface
 
 Guards run globally in this order: throttler, authenticate, roles, scopes.

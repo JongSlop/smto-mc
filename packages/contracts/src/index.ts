@@ -2,6 +2,7 @@ export * from './account.js';
 export * from './asset.js';
 export * from './leaderboard.js';
 export * from './minecraft.js';
+export * from './profile.js';
 export * from './server.js';
 export * from './service.js';
 export * from './stats.js';

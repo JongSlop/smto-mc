@@ -3,7 +3,7 @@
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
   import Card from '$lib/components/Card.svelte';
-  import ServerFilter, { type FilterServer } from '$lib/components/ServerFilter.svelte';
+  import ServerFilter from '$lib/components/ServerFilter.svelte';
   import SkinViewer from '$lib/components/SkinViewer.svelte';
   import SpeechBubble from '$lib/components/SpeechBubble.svelte';
   import StatsPanel from '$lib/components/StatsPanel.svelte';
@@ -13,7 +13,8 @@
   import { base, resolve } from '$app/paths';
   import { formatDateShort, formatDateTime } from '$lib/format';
   import { errorMessage, translate } from '$lib/i18n';
-  import { hasRecordedValue, type MetricValue } from '$lib/metrics';
+  import { hasRecordedValue } from '$lib/metrics';
+  import { filterOptions, scopeStats } from '$lib/serverScope';
   import type { ActionData, PageData } from './$types';
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -36,30 +37,10 @@
   const page = $derived(resolve('/(app)/players/[uuid]', { uuid: profile.mcUuid }));
   const skinUrl = $derived(`${base}/api/v1/public/skins/${profile.mcUuid}.png`);
 
-  /** Every server here has data by construction, which is what the chips need. */
-  const filterServers = $derived<FilterServer[]>(
-    servers.map((entry) => ({
-      id: entry.serverId,
-      name: entry.serverName,
-      iconUrl: entry.serverIconUrl,
-      state: entry.serverState,
-    })),
-  );
-
-  /** The one server the numbers are narrowed to, or null for the whole network. */
-  const scoped = $derived(servers.find((entry) => entry.serverId === data.server) ?? null);
-
-  /**
-   * What the panel lays out.
-   *
-   * Across every server that is the summed counters the API already provides.
-   * Narrowed to one, it is everything that server recorded, gauges included:
-   * the reason gauges are left out of the sums is that adding them up across
-   * servers means nothing, and that reason does not apply to a single one.
-   */
-  const metrics = $derived(
-    (scoped ? scoped.metrics : profile.stats.totals) as Record<string, MetricValue>,
-  );
+  const filterServers = $derived(filterOptions(servers));
+  const scope = $derived(scopeStats(profile.stats, data.server));
+  const scoped = $derived(scope.scoped);
+  const metrics = $derived(scope.metrics);
 
   const hasNumbers = $derived(Object.values(metrics).some(hasRecordedValue));
 

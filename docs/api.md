@@ -280,6 +280,35 @@ Rate limit: 60 requests per minute per address.
 
 ---
 
+## `GET /public/servers/{id}/stats`
+
+No credential. One server's numbers, added up across everybody who has played
+on it:
+
+```json
+{
+  "serverId": "i5",
+  "players": 3,
+  "totals": { "playtime_seconds": 270000, "deaths": 52, "blocks_mined": 168710 }
+}
+```
+
+`players` is how many players have something recorded above zero. `totals` holds
+counters only, summed over every player, and leaves out metrics that add up to
+nothing. Gauges are never in it, for the reason they are not in a player's
+`totals` either: a snapshot from each player, summed, describes nothing. Read a
+gauge from the player it belongs to.
+
+Every player counts, linked or not, since a total names nobody. That is also why
+this one is open while the leaderboards are not: they pair a name with a number,
+and this does not. It means unlinking does not shrink these numbers.
+
+`404 server_not_found` for an unknown or non-public server, the same answer as
+`GET /public/servers/{id}`. Cached for a minute (`Cache-Control: public,
+max-age=60`) and throttled to 30 a minute per address.
+
+---
+
 ## `GET /public/assets/{id}/{filename}`
 
 No credentials. An image an admin uploaded for a server: an icon, a background,

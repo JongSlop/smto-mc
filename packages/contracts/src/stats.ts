@@ -151,3 +151,25 @@ export const playerStatsSchema = z.object({
   servers: z.array(serverStatsSchema),
 });
 export type PlayerStats = z.infer<typeof playerStatsSchema>;
+
+/**
+ * A server's numbers added up across everybody who has played on it.
+ *
+ * No names and no per player rows: this is the shape of the server, not of any
+ * one person on it, which is why it can be read without signing in.
+ */
+export const serverTotalsSchema = z.object({
+  serverId: z.string(),
+  /**
+   * How many players have something recorded here above zero. A player with
+   * only zeros has not done anything a total could include, so is not counted.
+   */
+  players: z.number().int(),
+  /**
+   * Counters only, summed over every player. Adding up gauges would be
+   * meaningless for the reason it is on `PlayerStats`: a snapshot from each
+   * player summed is not a number that describes anything.
+   */
+  totals: z.record(z.string(), z.number()),
+});
+export type ServerTotals = z.infer<typeof serverTotalsSchema>;

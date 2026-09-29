@@ -9,6 +9,7 @@ import {
   type Leaderboards,
   type PlayerProfile,
   type PlayerStats,
+  type ServerTotals,
   type ServerStats,
 } from '@smto/mc-contracts';
 import { Prisma } from '@prisma/client';
@@ -235,6 +236,49 @@ export class StatsService {
       totals,
       servers,
     };
+  }
+
+  /**
+   * One server's numbers, added up across everybody who has played on it.
+   *
+   * Every player counts, linked or not. A total describes the server and names
+   * nobody, so there is no reason to leave out somebody who never linked, and
+   * leaving them out would make the server look emptier than it is. It also
+   * means unlinking does not shrink these numbers: unlinking is how somebody
+   * stops showing a profile, and a profile is not what this is.
+   *
+   * Counters only, and zeros are not counted as players, both for the reasons on
+   * the contract. The caller is expected to have checked the server is public.
+   */
+  async forServer(serverId: string): Promise<ServerTotals> {
+    const [sums, players] = await Promise.all([
+      this.prisma.$queryRaw<{ metric: string; total: bigint }[]>`
+        SELECT metric, SUM(value_num)::bigint AS total
+        FROM player_metrics
+        WHERE server_id = ${serverId}
+          AND value_num IS NOT NULL
+          AND value_num > 0
+        GROUP BY metric
+      `,
+      this.prisma.$queryRaw<{ players: bigint }[]>`
+        SELECT COUNT(DISTINCT mc_uuid)::bigint AS players
+        FROM player_metrics
+        WHERE server_id = ${serverId}
+          AND value_num IS NOT NULL
+          AND value_num > 0
+      `,
+    ]);
+
+    const totals: Record<string, number> = {};
+    for (const row of sums) {
+      // Filtered here rather than in SQL: which metrics are gauges is decided
+      // by the contracts package, and one list is better than two.
+      if (metricKind(row.metric) === 'counter') {
+        totals[row.metric] = Number(row.total);
+      }
+    }
+
+    return { serverId, players: Number(players[0]?.players ?? 0), totals };
   }
 
   /**

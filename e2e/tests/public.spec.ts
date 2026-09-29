@@ -32,10 +32,10 @@ test.describe('anonymous', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Laced Pack' })).toBeVisible();
     // Seeded from the live pack JSON, and the one thing a player came for.
     await expect(page.getByText('i5.smto.dev')).toBeVisible();
-    // Statistics need a session, so this half asks for one instead.
-    await expect(
-      page.getByRole('link', { name: /link a profile|profil verbinden/i }),
-    ).toBeVisible();
+    // The numbers are the server's own, added up across players, so they are
+    // open too. Nobody has played on the seeded stack, which is the case that
+    // has to say so rather than show a wall of zeros.
+    await expect(page.getByText(/nobody has been seen|noch niemand gesehen/i)).toBeVisible();
   });
 
   test('the archive renders, and says so when nothing is archived', async ({ page }) => {

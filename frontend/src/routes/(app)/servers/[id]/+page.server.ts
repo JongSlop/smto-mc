@@ -1,22 +1,26 @@
 import { error } from '@sveltejs/kit';
-import type { Me, ServerMeta, ServerStats } from '@smto/mc-contracts';
+import type { ServerMeta, ServerTotals } from '@smto/mc-contracts';
 
-import { ApiError, apiAuthed, apiPublic } from '$lib/server/api';
+import { ApiError, apiPublic } from '$lib/server/api';
 import type { PageServerLoad } from './$types';
 
 /**
- * One server, and what the signed-in person did on it.
+ * One server, and what everybody who has played on it has done.
  *
- * Two calls rather than one, because they answer different questions and have
- * different audiences: the metadata is public and the same for everybody, and
- * the statistics are personal. A visitor who is not signed in gets the first
- * half of the page, which is the half worth linking to.
+ * Both halves are public and the same for every visitor, so the page needs no
+ * session and the same address shows the same thing to everybody, which is what
+ * makes it worth linking to. The numbers are the server's own, added up across
+ * players: a person's numbers on a server are on their dashboard, narrowed
+ * there with the server filter.
  */
-export const load: PageServerLoad = async ({ params, locals, cookies }) => {
-  let server: ServerMeta;
-
+export const load: PageServerLoad = async ({ params }) => {
   try {
-    server = await apiPublic<ServerMeta>(`/api/v1/public/servers/${params.id}`);
+    const [server, totals] = await Promise.all([
+      apiPublic<ServerMeta>(`/api/v1/public/servers/${params.id}`),
+      apiPublic<ServerTotals>(`/api/v1/public/servers/${params.id}/stats`),
+    ]);
+
+    return { server, totals };
   } catch (cause) {
     // A hidden or unknown id is the same thing from out here, and the backend
     // deliberately does not distinguish them either.
@@ -26,14 +30,4 @@ export const load: PageServerLoad = async ({ params, locals, cookies }) => {
 
     throw cause;
   }
-
-  if (!locals.account) {
-    return { server, linked: false, stats: null };
-  }
-
-  const me = await apiAuthed<Me>(cookies, '/api/v1/me');
-  const stats: ServerStats | null =
-    me.stats.servers.find((entry) => entry.serverId === server.id) ?? null;
-
-  return { server, linked: me.link !== null, stats };
 };

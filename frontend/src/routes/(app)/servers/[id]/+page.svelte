@@ -1,12 +1,10 @@
 <script lang="ts">
-  import Button from '$lib/components/Button.svelte';
   import Card from '$lib/components/Card.svelte';
-  import MetricList from '$lib/components/MetricList.svelte';
   import ServerIcon from '$lib/components/ServerIcon.svelte';
-  import { resolve } from '$app/paths';
-  import { formatDate, formatDateTime } from '$lib/format';
+  import StatsPanel from '$lib/components/StatsPanel.svelte';
+  import { formatDate } from '$lib/format';
   import { translate } from '$lib/i18n';
-  import { metricEntries, type MetricValue } from '$lib/metrics';
+  import type { MetricValue } from '$lib/metrics';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
@@ -32,15 +30,13 @@
   );
 
   /**
-   * Everything recorded here, as one list.
+   * The server's numbers, added up across every player.
    *
-   * No tiles, unlike the dashboard. The headline row is for the numbers across
-   * the whole network, and repeating it per server turned one page into nine
-   * copies of the dashboard. Zeros stay hidden, as they do in every list.
+   * The same tiles and the same "show all" list as a player's own page, because
+   * they are the same kind of thing: a handful of headline counters and then
+   * everything else. Only the subject changed, from one person to all of them.
    */
-  const entries = $derived(
-    data.stats ? metricEntries(data.stats.metrics as Record<string, MetricValue>) : [],
-  );
+  const metrics = $derived(data.totals.totals as Record<string, MetricValue>);
 </script>
 
 <svelte:head>
@@ -84,26 +80,14 @@
 <section class="stats">
   <h2>{t.server_stats()}</h2>
 
-  {#if !data.linked}
-    <Card title={t.dashboard_notLinkedHeading()} description={t.dashboard_notLinkedBody()}>
-      <div>
-        <a href={resolve('/settings')}><Button>{t.dashboard_linkNow()}</Button></a>
-      </div>
-    </Card>
-  {:else if entries.length === 0}
+  {#if data.totals.players === 0}
     <Card title={t.dashboard_noStatsHeading()} description={t.server_noStatsBody()}>
       <span></span>
     </Card>
   {:else}
-    {#if data.stats?.lastSeenAt}
-      <p class="muted">
-        {t.dashboard_lastSeen({ when: formatDateTime(data.stats.lastSeenAt, data.lang) })}
-      </p>
-    {/if}
+    <p class="muted">{t.server_statsCombined({ count: data.totals.players })}</p>
 
-    <Card>
-      <MetricList {entries} />
-    </Card>
+    <StatsPanel {metrics} />
   {/if}
 </section>
 

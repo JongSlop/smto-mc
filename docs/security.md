@@ -197,6 +197,21 @@ Two rules keep the page from becoming a way to learn things it should not:
   server with `isPublic` off is one nobody was meant to see, and its numbers
   showing up inside a total would tell them it exists.
 
+## What is open without signing in
+
+Server metadata, uploaded server images, skins, and one number set:
+`GET /public/servers/{id}/stats`, a server's counters added up across all its
+players. That one is open on purpose. It has no names and no per player rows, so
+there is nothing in it that belongs to a person, unlike a leaderboard row or a
+profile, which pair a name with what somebody did and stay behind a session.
+
+Two limits on that. On a server with one player the total is that player's
+numbers, so it is only anonymous in proportion to how many people play. And
+polling it over time shows when somebody is playing; the same is already true of
+the server list ping in the game. Neither seemed worth hiding a server's own
+totals for, but if either matters, the fix is to require a session on this one
+route, which is a single decorator.
+
 ## The speech bubble
 
 The one thing on the site that a player writes and strangers read, so it gets

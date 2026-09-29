@@ -1,6 +1,7 @@
 <script lang="ts">
   import Button from '$lib/components/Button.svelte';
   import Card from '$lib/components/Card.svelte';
+  import ServerFilter from '$lib/components/ServerFilter.svelte';
   import SkinViewer from '$lib/components/SkinViewer.svelte';
   import StatsPanel from '$lib/components/StatsPanel.svelte';
   // `base` alongside `resolve` on purpose: resolve() only knows this app's
@@ -9,7 +10,8 @@
   import { base, resolve } from '$app/paths';
   import { formatDateShort } from '$lib/format';
   import { translate } from '$lib/i18n';
-  import type { MetricValue } from '$lib/metrics';
+  import { hasRecordedValue } from '$lib/metrics';
+  import { filterOptions, scopeStats } from '$lib/serverScope';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
@@ -17,6 +19,11 @@
   const t = $derived(translate(data.lang));
   const link = $derived(data.me.link);
   const stats = $derived(data.me.stats);
+
+  const dashboard = $derived(resolve('/(app)/dashboard'));
+  const filterServers = $derived(filterOptions(stats.servers));
+  const scope = $derived(scopeStats(stats, data.server));
+  const hasNumbers = $derived(Object.values(scope.metrics).some(hasRecordedValue));
 
   // Served from our own origin so the 3D renderer can read the pixels off it.
   const skinUrl = $derived(link ? `${base}/api/v1/public/skins/${link.mcUuid}.png` : null);
@@ -79,20 +86,33 @@
 
     <div class="right">
       <!--
-        The headline numbers, summed across every server. `totals` carries
-        counters only, so these are all safely additive; a gauge stays visible
-        in its own server's list rather than being added to a number that would
-        mean nothing.
+        Across every server by default, or narrowed to one. The headline
+        numbers are counters summed over the servers; a gauge shows only when a
+        single server is chosen, since adding snapshots up means nothing.
       -->
-      <StatsPanel metrics={stats.totals as Record<string, MetricValue>} />
+      <ServerFilter
+        servers={filterServers}
+        selected={scope.scoped?.serverId ?? null}
+        hrefFor={(id) =>
+          id === null ? dashboard : `${dashboard}?server=${encodeURIComponent(id)}`}
+      />
+
+      {#if hasNumbers}
+        <StatsPanel metrics={scope.metrics} />
+      {:else if scope.scoped}
+        <Card
+          title={t.dashboard_noStatsHeading()}
+          description={t.dashboard_noStatsOnServer({ server: scope.scoped.serverName })}
+        >
+          <span></span>
+        </Card>
+      {/if}
     </div>
   </div>
 
   <!--
-    Per server numbers live on the server's own page, reachable from the Servers
-    menu in the header. Repeating them here made the dashboard a second, worse
-    copy of five pages, and a player who wants to know what they did on one
-    server wants the rest of that server's page with it.
+    Nothing recorded anywhere yet. With something recorded the right hand side
+    says so itself, for the one server it is narrowed to.
   -->
   {#if stats.servers.length === 0}
     <Card title={t.dashboard_noStatsHeading()} description={t.dashboard_noStatsBody()}>

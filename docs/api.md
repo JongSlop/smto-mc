@@ -360,7 +360,22 @@ Returns the top ten for every featured metric, summed across all servers:
   "boards": [
     {
       "metric": "playtime_seconds",
-      "entries": [{ "rank": 1, "mcUuid": "069a79f4-...", "mcUsername": "Notch", "value": 6000 }]
+      "entries": [
+        {
+          "rank": 1,
+          "mcUuid": "069a79f4-...",
+          "mcUsername": "Notch",
+          "linked": true,
+          "value": 6000
+        },
+        {
+          "rank": 2,
+          "mcUuid": "61699b2e-...",
+          "mcUsername": "Dinnerbone",
+          "linked": false,
+          "value": 5000
+        }
+      ]
     }
   ]
 }
@@ -378,12 +393,20 @@ is not an error: it returns `boards: []`.
 the admin area sets, and does not change with `?server=`. It is what the
 website's filter offers, and it leaves out servers whose boards would be empty.
 
-Three rules worth knowing before you build against it. Only profiles linked
-here appear, because the metric rows carry a UUID and the display name for one
-exists only where somebody has linked an account. A total of zero is never
-ranked, the same rule the website's lists follow. Boards nobody is on are left
-out rather than returned empty, so the array is not a fixed length and you
-should look metrics up by name rather than by position.
+**Who is on a board.** Everybody with something recorded, whether or not they
+have a linked profile here. `linked` says which: `true` for somebody with a live
+link, with the name they linked under, and `false` for everybody else, with the
+name Mojang has for their UUID. That includes somebody who linked once and
+unlinked since: unlinking detaches a profile from an account and does not take
+anybody off the boards. That lookup is cached, and if Mojang cannot be
+asked and nothing is cached yet, `mcUsername` is the first eight characters of
+the UUID rather than an error, so treat the name as a label and the UUID as the
+identity.
+
+Two more rules. A total of zero is never ranked, the same rule the website's
+lists follow. Boards nobody is on are left out rather than returned empty, so
+the array is not a fixed length and you should look metrics up by name rather
+than by position. Ties go to a linked player first, by name, then by UUID.
 
 Servers that are not public are left out of every sum and out of `servers`.
 
@@ -397,12 +420,13 @@ table, so cache it for a minute rather than calling it per player.
 `X-Api-Key` or a browser session, no scope, the same door as the leaderboards.
 This is the page behind a leaderboard row on the website.
 
-`uuid` is a Minecraft UUID, dashed or not. Returns one linked player:
+`uuid` is a Minecraft UUID, dashed or not. Returns one player:
 
 ```json
 {
   "mcUuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
   "mcUsername": "Notch",
+  "linked": true,
   "linkedSince": "2026-03-04T00:00:00.000Z",
   "message": "Come and see my farm",
   "stats": {
@@ -423,6 +447,12 @@ This is the page behind a leaderboard row on the website.
 }
 ```
 
+`linked` is whether the player has a live link here. Somebody without one, who
+never linked or unlinked since, still has a page, with the name Mojang has for them, so that every row on a
+leaderboard can be opened: for them `linkedSince` and `message` are `null`, and
+the numbers are whatever the servers recorded. `mcUsername` falls back to the
+first eight characters of the UUID as it does on the leaderboards.
+
 `message` is the speech bubble the player wrote for their page, or `null`. It is
 plain text: a single line of at most 80 characters, already cleaned up, and
 never HTML. Whoever renders it has to escape it like any other user text.
@@ -439,10 +469,10 @@ the profile was verified. Servers that are not public are left out of `servers`
 and out of `totals`, and the leaderboards leave them out of their sums for the
 same reason, so a player's page and their board reading agree.
 
-`404 profile_not_found` for a UUID that was never linked, was unlinked since, or
-is not a UUID at all. All three get the same answer, so whether somebody once
-had a page is not something a caller can find out. Statistics survive unlinking
-(see the security notes), but the page does not.
+`404 profile_not_found` for a UUID with nothing to show: one that has nothing
+recorded above zero on a public server, or something that is not a UUID at all.
+They get the same answer, so a caller cannot use the page to ask whether a UUID
+has ever played here.
 
 Throttled to 60 a minute per address.
 

@@ -13,8 +13,17 @@ export const leaderboardEntrySchema = z.object({
   /** 1 based, and dense in the sense that ties are broken rather than shared. */
   rank: z.number().int().positive(),
   mcUuid: z.string(),
-  /** The cached display name, which is why only linked profiles appear. */
+  /**
+   * Who this is. For a linked profile the name it was linked under. For anybody
+   * without a live link, the name Mojang has for the UUID, or if Mojang could
+   * not be asked and nothing is cached, the first eight characters of the UUID.
+   */
   mcUsername: z.string(),
+  /**
+   * Whether this player has a live link here. The only difference between
+   * the two kinds of row, and what the badge next to a name says.
+   */
+  linked: z.boolean(),
   /** Summed across every server unless the boards are narrowed to one. */
   value: z.number(),
 });

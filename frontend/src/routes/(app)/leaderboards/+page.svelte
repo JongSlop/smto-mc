@@ -1,5 +1,6 @@
 <script lang="ts">
   import Card from '$lib/components/Card.svelte';
+  import LinkedBadge from '$lib/components/LinkedBadge.svelte';
   import MetricIcon from '$lib/components/MetricIcon.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import ServerFilter from '$lib/components/ServerFilter.svelte';
@@ -113,7 +114,9 @@
           <a href={resolve('/(app)/players/[uuid]', { uuid: entry.mcUuid })}>
             <span class="rank">{entry.rank}</span>
             <PlayerFace mcUuid={entry.mcUuid} size={40} />
-            <span class="name">{entry.mcUsername}</span>
+            <span class="name">
+              {entry.mcUsername}{#if entry.linked}<LinkedBadge />{/if}
+            </span>
             <span class="value">{formatMetric(entry.value, data.board.metric, data.lang)}</span>
           </a>
         </li>

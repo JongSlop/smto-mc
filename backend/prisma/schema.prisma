@@ -335,6 +335,20 @@ model AuditLog {
 /// player. It exists to keep the session server's rate limit away from a page
 /// that renders one skin per visitor, and to avoid a third-party CDN in the
 /// page's CSP.
+/// What Mojang says a UUID is called, for players who never linked here and so
+/// have no name of their own in this database. A cache and nothing more:
+/// dropping it costs one lookup per player, and a name that changes is picked
+/// up when the row expires.
+model PlayerName {
+  mcUuid    String   @id @map("mc_uuid") @db.Uuid
+  /// Null when Mojang does not know the profile, which is what an offline-mode
+  /// UUID looks like. Kept so it is not asked about again on every page view.
+  username  String?
+  fetchedAt DateTime @default(now()) @map("fetched_at") @db.Timestamptz(3)
+
+  @@map("player_names")
+}
+
 model SkinCache {
   mcUuid      String   @id @map("mc_uuid") @db.Uuid
   /// The PNG itself. Skins are 64x64 and a few kilobytes, so a column is

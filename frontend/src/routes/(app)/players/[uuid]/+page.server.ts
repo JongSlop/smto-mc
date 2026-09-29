@@ -28,8 +28,8 @@ export const load: PageServerLoad = async ({ params, locals, cookies, url }) => 
       apiAuthed<MinecraftLink | null>(cookies, '/api/v1/me/link'),
     ]);
   } catch (cause) {
-    // Never linked, unlinked since, or not a UUID at all. The backend gives one
-    // answer for all three and so does this.
+    // Nothing recorded for this UUID, or not a UUID at all. The backend gives one
+    // answer for both and so does this.
     if (cause instanceof ApiError && cause.status === 404) {
       error(404, 'profile_not_found');
     }

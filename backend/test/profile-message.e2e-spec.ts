@@ -169,15 +169,28 @@ describe('profile message', () => {
     await request(app.getHttpServer()).put('/api/v1/me/message').send({ message: 'x' }).expect(401);
   });
 
-  it('goes with the page when the profile is unlinked, and comes back on relinking', async () => {
+  it('is not shown while the profile is unlinked, and comes back on relinking', async () => {
     await put({ message: 'still here' }).expect(200);
+    await prisma.playerMetric.create({
+      data: {
+        mcUuid: NOTCH,
+        serverId: 'i5',
+        metric: 'playtime_seconds',
+        valueNum: 60n,
+        recordedAt: new Date(),
+      },
+    });
     const session = await viewer();
 
+    // The page still exists, since there are numbers on it, but it is the
+    // plain kind for somebody without a live link and carries no message.
     await prisma.minecraftLink.updateMany({ data: { unlinkedAt: new Date() } });
-    await request(app.getHttpServer())
+    const unlinked = await request(app.getHttpServer())
       .get(`/api/v1/players/${NOTCH}`)
       .set('authorization', `Bearer ${session}`)
-      .expect(404);
+      .expect(200);
+
+    expect(unlinked.body).toMatchObject({ linked: false, message: null });
 
     // Kept on the account, so linking a profile again does not start over.
     await prisma.minecraftLink.create({

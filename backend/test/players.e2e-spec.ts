@@ -3,12 +3,14 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { PrismaService } from '../src/database/prisma.service';
+import { PlayerNamesService } from '../src/names/player-names.service';
 import {
   createAccount,
   createApiToken,
   createServer,
   createSession,
   createTestApp,
+  fakeNames,
   resetDatabase,
 } from './helpers';
 
@@ -25,9 +27,12 @@ describe('GET /api/v1/players/:uuid', () => {
 
   const NOTCH = '069a79f4-44e9-4726-a5be-fca90e38aaf5';
   const JEB = '853c80ef-3c37-49fd-aa49-938b674adae6';
+  const DINNERBONE = '61699b2e-d327-4a01-9f1e-0ea8c3f06bc6';
 
   beforeAll(async () => {
-    ({ app, prisma } = await createTestApp());
+    ({ app, prisma } = await createTestApp((builder) =>
+      builder.overrideProvider(PlayerNamesService).useValue(fakeNames),
+    ));
   });
 
   afterAll(async () => {
@@ -93,6 +98,7 @@ describe('GET /api/v1/players/:uuid', () => {
     const response = await get(`/api/v1/players/${NOTCH}`).expect(200);
 
     expect(Object.keys(response.body).sort()).toEqual([
+      'linked',
       'linkedSince',
       'mcUsername',
       'mcUuid',
@@ -120,17 +126,79 @@ describe('GET /api/v1/players/:uuid', () => {
     expect(response.body.stats.servers).toHaveLength(1);
   });
 
-  it('has no page for a profile that was never linked, or has been unlinked', async () => {
+  it('marks a linked player as linked', async () => {
+    await link('notch', NOTCH);
+
+    const response = await get(`/api/v1/players/${NOTCH}`).expect(200);
+
+    expect(response.body).toMatchObject({ linked: true, mcUsername: 'notch' });
+  });
+
+  describe('a player who never linked', () => {
+    it('has a page with the name Mojang has, no link date and no message', async () => {
+      await record(DINNERBONE, 'i5', 'playtime_seconds', 3600n);
+      await record(DINNERBONE, 'i5', 'deaths', 2n);
+
+      const response = await get(`/api/v1/players/${DINNERBONE}`).expect(200);
+
+      expect(response.body).toMatchObject({
+        mcUuid: DINNERBONE,
+        mcUsername: 'Dinnerbone',
+        linked: false,
+        linkedSince: null,
+        message: null,
+        stats: { totalPlaytimeSeconds: 3600, totals: { playtime_seconds: 3600, deaths: 2 } },
+      });
+    });
+
+    it('shows the start of the UUID when no name can be found', async () => {
+      await record(JEB, 'i5', 'playtime_seconds', 60n);
+
+      const response = await get(`/api/v1/players/${JEB}`).expect(200);
+
+      expect(response.body.mcUsername).toBe('853c80ef');
+    });
+
+    it('has no page until something has been recorded for them', async () => {
+      // Never seen, and seen with nothing but zeros. Both are a 404, so the
+      // page cannot be used to ask whether a UUID has ever played here.
+      await get(`/api/v1/players/${DINNERBONE}`).expect(404);
+
+      await record(DINNERBONE, 'i5', 'playtime_seconds', 0n);
+      await get(`/api/v1/players/${DINNERBONE}`).expect(404);
+    });
+
+    it('leaves a hidden server off their page as it does for everybody', async () => {
+      await createServer(prisma, 'secret', { isPublic: false });
+      await record(DINNERBONE, 'secret', 'playtime_seconds', 9000n);
+
+      await get(`/api/v1/players/${DINNERBONE}`).expect(404);
+    });
+  });
+
+  it('keeps a page after unlinking, shown as not linked, with the statistics still on it', async () => {
+    // Unlinking detaches a profile from an account. It takes nothing off the
+    // network, so the numbers stay and only the kind of page changes.
+    await link('dinnerbone', DINNERBONE, true);
+    await record(DINNERBONE, 'i5', 'playtime_seconds', 1000n);
+
+    const response = await get(`/api/v1/players/${DINNERBONE}`).expect(200);
+
+    expect(response.body).toMatchObject({
+      mcUsername: 'Dinnerbone',
+      linked: false,
+      linkedSince: null,
+      message: null,
+      stats: { totalPlaytimeSeconds: 1000 },
+    });
+  });
+
+  it('has no page for somebody who unlinked and has nothing recorded', async () => {
     await link('jeb', JEB, true);
-    await record(JEB, 'i5', 'playtime_seconds', 1000n);
-    await record(NOTCH, 'i5', 'playtime_seconds', 1000n);
 
-    // Both get the same answer, so the difference is not something to probe for.
-    const unlinked = await get(`/api/v1/players/${JEB}`).expect(404);
-    const unknown = await get(`/api/v1/players/${NOTCH}`).expect(404);
+    const response = await get(`/api/v1/players/${JEB}`).expect(404);
 
-    expect(unlinked.body.message).toBe('profile_not_found');
-    expect(unknown.body.message).toBe('profile_not_found');
+    expect(response.body.message).toBe('profile_not_found');
   });
 
   it('treats something that is not a UUID as not found', async () => {

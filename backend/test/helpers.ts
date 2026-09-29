@@ -51,7 +51,8 @@ export async function resetDatabase(prisma: PrismaService): Promise<void> {
       "accounts",
       "server_assets",
       "servers",
-      "skin_cache"
+      "skin_cache",
+      "player_names"
     RESTART IDENTITY CASCADE
   `);
 }
@@ -144,3 +145,20 @@ export async function createSession(
 
   return token;
 }
+
+/**
+ * A stand in for the name lookup, so no test asks Mojang anything.
+ *
+ * Answers from a fixed table and says null for everybody else, which is what
+ * Mojang does for a UUID it has no profile for. It is a plain object because
+ * that is all a caller of `resolve` ever uses.
+ */
+export const fakeNames = {
+  names: {
+    '61699b2e-d327-4a01-9f1e-0ea8c3f06bc6': 'Dinnerbone',
+    '069a79f4-44e9-4726-a5be-fca90e38aaf5': 'NotchFromMojang',
+  } as Record<string, string>,
+  async resolve(uuids: string[]): Promise<Map<string, string | null>> {
+    return new Map(uuids.map((uuid) => [uuid, this.names[uuid] ?? null]));
+  },
+};

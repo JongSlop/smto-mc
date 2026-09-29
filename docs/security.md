@@ -169,8 +169,10 @@ that check. Unlinking is a soft delete, which is why the indexes have to be
 partial.
 
 Statistics are keyed by Minecraft UUID rather than by account, so they survive
-unlinking and come back if the same profile is linked again. Unlinking is how
-somebody stops showing a profile, not how they delete their playtime.
+unlinking and come back if the same profile is linked again. Unlinking detaches
+a profile from an account. It is not a way to leave the leaderboards or to
+delete playtime: somebody who unlinks carries on being listed, without the
+linked badge, under the name Mojang has for them.
 
 ## Who can see a player's page
 
@@ -179,20 +181,36 @@ behind a session or a plugin token, exactly like the leaderboards that link to
 it. A profile pairs a name with everything that player has done, which is more
 than a leaderboard row shows, so it would make no sense for the row to need a
 credential and the page not to. Any signed-in smto.dev account can open any
-linked profile; there is no per-player privacy setting yet. If one is wanted, it
-belongs on the account and has to be honoured by the leaderboards as well, or it
-protects nothing.
+profile that exists; there is no per-player privacy setting yet. If one is
+wanted, it belongs on the account and has to be honoured by the leaderboards as
+well, or it protects nothing.
 
-What another person sees is deliberately narrow: the cached Minecraft name, the
-UUID, the date the profile was linked, and the numbers. Not the smto.dev account
-id or username, and not how the profile was verified.
+What another person sees is deliberately narrow: the Minecraft name, the UUID,
+the date the profile was linked if it was, and the numbers. Not the smto.dev
+account id or username, and not how the profile was verified.
 
-Two rules keep the page from becoming a way to learn things it should not:
+**Players without a live link are shown too.** The leaderboards and the page
+list everybody with something recorded, under the name Mojang has for their
+UUID, and mark the ones who linked with a checkmark. That covers somebody who
+never linked and somebody who linked once and unlinked since. A UUID and its
+name are public through Mojang, and the numbers are what the network's own
+servers recorded, so nothing is disclosed here that somebody could not already
+look up. The name comes from Mojang's session server, is cached for a day, and
+is looked up a few at a time and with a short time budget. A failed or rate
+limited lookup shows the first eight characters of the UUID instead and never
+fails the page.
 
-- **A page exists only while a link is live.** Statistics are keyed by UUID and
-  survive unlinking, so metric rows alone are not enough to answer. Otherwise
-  unlinking, which is how somebody stops showing a profile, would do nothing.
-  "Never linked" and "unlinked since" return the same 404.
+That is deliberate. The statistics are the network's record of who played on it,
+and a link only adds a verified name, a message and a badge, so unlinking
+changes which of those a player has and nothing else. If somebody ever needs to
+be removed from the boards outright, that is a manual job against
+`player_metrics`, not something the unlink button promises.
+
+Two rules keep the pages from becoming a way to learn things they should not:
+
+- **A page needs something to show.** A UUID with nothing recorded above zero on
+  a public server is a 404, so it cannot be used to enumerate who has ever
+  joined. "Never played" and "nothing recorded" are the same answer.
 - **Hidden servers are left out** of a profile and of the leaderboard sums. A
   server with `isPublic` off is one nobody was meant to see, and its numbers
   showing up inside a total would tell them it exists.

@@ -3,6 +3,7 @@
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
   import Card from '$lib/components/Card.svelte';
+  import LinkedBadge from '$lib/components/LinkedBadge.svelte';
   import ServerFilter from '$lib/components/ServerFilter.svelte';
   import SkinViewer from '$lib/components/SkinViewer.svelte';
   import SpeechBubble from '$lib/components/SpeechBubble.svelte';
@@ -64,7 +65,18 @@
   <a href={resolve('/(app)/leaderboards')}>← {t.profile_back()}</a>
 </p>
 
-<h1>{profile.mcUsername}</h1>
+<h1>
+  {profile.mcUsername}{#if profile.linked}<LinkedBadge size={26} />{/if}
+</h1>
+
+<!--
+  A page exists for somebody who never linked, so a leaderboard row always
+  opens. Saying so on the page keeps it from reading as a broken profile, and
+  tells a reader why there is no message and no link date.
+-->
+{#if !profile.linked}
+  <Alert variant="info">{t.profile_notLinked()}</Alert>
+{/if}
 
 <div class="profile">
   <Card>
@@ -138,10 +150,12 @@
         <dt>{t.dashboard_serversPlayed()}</dt>
         <dd>{servers.length}</dd>
       </div>
-      <div>
-        <dt>{t.dashboard_linkedSince()}</dt>
-        <dd>{formatDateShort(profile.linkedSince, data.lang)}</dd>
-      </div>
+      {#if profile.linkedSince}
+        <div>
+          <dt>{t.dashboard_linkedSince()}</dt>
+          <dd>{formatDateShort(profile.linkedSince, data.lang)}</dd>
+        </div>
+      {/if}
       {#if lastSeen}
         <div>
           <dt>{t.profile_lastSeenLabel()}</dt>

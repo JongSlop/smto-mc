@@ -37,8 +37,8 @@ export class PlayersController {
 
     const profile = await this.stats.profile(parsed.data);
 
-    // The same answer for "never linked" and "unlinked since": whether somebody
-    // once had a page is not something a stranger gets to find out.
+    // Nothing recorded, or not a player at all. One answer for both, so the page
+    // cannot be used to ask whether a UUID has ever played here.
     if (!profile) {
       throw new NotFoundException('profile_not_found');
     }

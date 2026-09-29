@@ -16,8 +16,23 @@ import { Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
+import { PlayerNamesService } from '../names/player-names.service';
 
 type Rejection = IngestResult['rejected'][number];
+
+/** What stands in for a name nobody could look up: enough to tell players apart. */
+function shortId(mcUuid: string): string {
+  return mcUuid.slice(0, 8);
+}
+
+/** Whether anything has actually been recorded, as opposed to a row of zeros. */
+function hasActivity(stats: PlayerStats): boolean {
+  return stats.servers.some((server) =>
+    Object.values(server.metrics).some((value) =>
+      typeof value === 'number' ? value > 0 : Object.keys(value).length > 0,
+    ),
+  );
+}
 
 /**
  * The statistics store.
@@ -32,6 +47,7 @@ export class StatsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly names: PlayerNamesService,
   ) {}
 
   /**
@@ -243,9 +259,7 @@ export class StatsService {
    *
    * Every player counts, linked or not. A total describes the server and names
    * nobody, so there is no reason to leave out somebody who never linked, and
-   * leaving them out would make the server look emptier than it is. It also
-   * means unlinking does not shrink these numbers: unlinking is how somebody
-   * stops showing a profile, and a profile is not what this is.
+   * leaving them out would make the server look emptier than it is.
    *
    * Counters only, and zeros are not counted as players, both for the reasons on
    * the contract. The caller is expected to have checked the server is public.
@@ -284,10 +298,13 @@ export class StatsService {
   /**
    * A profile as somebody else sees it, or null where there is nothing to see.
    *
-   * A page exists only for a UUID with a live link. Metric rows alone are not
-   * enough: without a link there is no display name to put on it, and more to
-   * the point, unlinking is how a player stops having a page. Answering for any
-   * UUID that has rows would make that switch do nothing.
+   * Two kinds of page. A player with a live link gets the full one, with the
+   * name they linked under and their message. Everybody else gets a plain one,
+   * with a name from Mojang and a flag saying so, as long as something has been
+   * recorded for them: a leaderboard row has to open, and it does not matter
+   * whether the player never linked or linked once and unlinked since. Unlinking
+   * detaches a profile from an account, it does not take anybody's statistics
+   * off the network, so it changes which kind of page this is and nothing else.
    *
    * Public servers only, the same rule the leaderboard follows, so the totals
    * on a page and the reading on the board beside it are the same number.
@@ -303,16 +320,32 @@ export class StatsService {
       },
     });
 
-    if (!link) {
+    if (link) {
+      return {
+        mcUuid: link.mcUuid,
+        mcUsername: link.mcUsername,
+        linked: true,
+        linkedSince: link.verifiedAt.toISOString(),
+        message: link.account.profileMessage,
+        stats: await this.forProfile(link.mcUuid, { publicOnly: true }),
+      };
+    }
+
+    const stats = await this.forProfile(mcUuid, { publicOnly: true });
+
+    if (!hasActivity(stats)) {
       return null;
     }
 
+    const names = await this.names.resolve([mcUuid]);
+
     return {
-      mcUuid: link.mcUuid,
-      mcUsername: link.mcUsername,
-      linkedSince: link.verifiedAt.toISOString(),
-      message: link.account.profileMessage,
-      stats: await this.forProfile(link.mcUuid, { publicOnly: true }),
+      mcUuid,
+      mcUsername: names.get(mcUuid) ?? shortId(mcUuid),
+      linked: false,
+      linkedSince: null,
+      message: null,
+      stats,
     };
   }
 
@@ -320,10 +353,9 @@ export class StatsService {
    * The top players for each featured metric, summed across every server, or
    * counted on one when `serverId` is given.
    *
-   * Linked profiles only, and that is a data limit rather than a policy: the
-   * metric rows carry a UUID, and the display name for one exists only where
-   * somebody has linked their account here. A board of raw UUIDs would be
-   * useless to read.
+   * Players who linked, and everybody else. The metric rows carry only a UUID,
+   * so the name of somebody without a live link, whether they never linked or
+   * unlinked since, is looked up from Mojang and cached.
    *
    * One query for every board. Ranking nine metrics with nine round trips
    * would be nine sequential scans of the same table, so the window function
@@ -348,21 +380,31 @@ export class StatsService {
     const onServer = serverId === null ? Prisma.empty : Prisma.sql`AND pm.server_id = ${serverId}`;
 
     const rows = await this.prisma.$queryRaw<
-      { metric: string; mcUuid: string; mcUsername: string; total: bigint; rank: bigint }[]
+      {
+        metric: string;
+        mcUuid: string;
+        linkedName: string | null;
+        linked: boolean;
+        total: bigint;
+        rank: bigint;
+      }[]
     >`
-      SELECT metric, mc_uuid AS "mcUuid", mc_username_cache AS "mcUsername", total, rank
+      SELECT metric, mc_uuid AS "mcUuid", linked_name AS "linkedName", linked, total, rank
       FROM (
         SELECT
           pm.metric,
           pm.mc_uuid,
-          l.mc_username_cache,
+          l.mc_username_cache AS linked_name,
+          (l.id IS NOT NULL) AS linked,
           SUM(pm.value_num)::bigint AS total,
           ROW_NUMBER() OVER (
             PARTITION BY pm.metric
-            ORDER BY SUM(pm.value_num) DESC, l.mc_username_cache ASC
+            -- Ties by name where there is one, then by UUID, which is the only
+            -- thing every player has and so the only stable last word.
+            ORDER BY SUM(pm.value_num) DESC, l.mc_username_cache ASC NULLS LAST, pm.mc_uuid ASC
           ) AS rank
         FROM player_metrics pm
-        JOIN minecraft_links l
+        LEFT JOIN minecraft_links l
           ON l.mc_uuid = pm.mc_uuid
           AND l.unlinked_at IS NULL
         JOIN servers s
@@ -376,11 +418,17 @@ export class StatsService {
           -- rule the lists on the dashboard follow.
           AND pm.value_num > 0
           ${onServer}
-        GROUP BY pm.metric, pm.mc_uuid, l.mc_username_cache
+        GROUP BY pm.metric, pm.mc_uuid, l.mc_username_cache, (l.id IS NOT NULL)
       ) ranked
       WHERE rank <= ${limit}
       ORDER BY metric, rank
     `;
+
+    // Names for the players who have none of their own, looked up once for the
+    // whole page rather than per row.
+    const names = await this.names.resolve(
+      rows.filter((row) => !row.linked).map((row) => row.mcUuid),
+    );
 
     const byMetric = new Map<string, Leaderboards['boards'][number]['entries']>();
 
@@ -389,7 +437,10 @@ export class StatsService {
       entries.push({
         rank: Number(row.rank),
         mcUuid: row.mcUuid,
-        mcUsername: row.mcUsername,
+        mcUsername: row.linked
+          ? (row.linkedName ?? shortId(row.mcUuid))
+          : (names.get(row.mcUuid) ?? shortId(row.mcUuid)),
+        linked: row.linked,
         value: Number(row.total),
       });
       byMetric.set(row.metric, entries);
@@ -424,8 +475,8 @@ export class StatsService {
    * Independent of which server is being looked at, so the choices do not
    * change under the person choosing, and limited to servers that would show
    * something, so nobody is offered a filter that leads to an empty page. The
-   * same eligibility rules as the boards: a live link, a featured metric, and a
-   * value above zero.
+   * same eligibility rules as the boards: a player who may be shown, a featured
+   * metric, and a value above zero.
    */
   private async serversOnBoards(): Promise<Leaderboards['servers']> {
     const rows = await this.prisma.$queryRaw<
@@ -437,9 +488,6 @@ export class StatsService {
         AND EXISTS (
           SELECT 1
           FROM player_metrics pm
-          JOIN minecraft_links l
-            ON l.mc_uuid = pm.mc_uuid
-            AND l.unlinked_at IS NULL
           WHERE pm.server_id = s.id
             AND pm.metric IN (${Prisma.join([...FEATURED_METRICS])})
             AND pm.value_num > 0

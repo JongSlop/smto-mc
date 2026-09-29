@@ -151,8 +151,9 @@ export class LinkingService {
    *
    * The statistics are keyed by Minecraft UUID rather than by account, so they
    * are untouched by this and come back if the same profile is linked again.
-   * That is deliberate: unlinking is how somebody stops showing a profile on
-   * their account, not how they delete their playtime.
+   * That is deliberate: unlinking detaches a profile from an account, it does
+   * not delete anybody's playtime, and they carry on showing on the boards
+   * without the linked badge.
    */
   async unlink(accountId: string, context: { ipAddress?: string } = {}): Promise<void> {
     const existing = await this.prisma.minecraftLink.findFirst({

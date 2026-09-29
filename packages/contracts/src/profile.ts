@@ -59,10 +59,17 @@ export type SetProfileMessageInput = z.infer<typeof setProfileMessageSchema>;
 
 export const playerProfileSchema = z.object({
   mcUuid: z.string(),
-  /** The cached display name. The UUID is the identity, the name only a label. */
+  /** The name to show. The UUID is the identity, the name only a label. */
   mcUsername: z.string(),
-  /** When this profile was linked, which is when the page starts to exist. */
-  linkedSince: z.iso.datetime(),
+  /**
+   * Whether the player has a live link here. A page also exists for a player
+   * without one, whether they never linked or unlinked since, as long as
+   * something has been recorded for them, so a leaderboard row can always be
+   * opened. Those pages have no message and no link date, and say so.
+   */
+  linked: z.boolean(),
+  /** When the profile was linked, or null for a player who never linked. */
+  linkedSince: z.iso.datetime().nullable(),
   /** What the player has chosen to say, shown as a speech bubble. Null for nothing. */
   message: z.string().nullable(),
   stats: playerStatsSchema,

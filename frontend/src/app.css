@@ -35,7 +35,8 @@
   /*
    * Headings only, and never body text: a pixel face at paragraph size is
    * unreadable and the German copy is longer than the English. Silkscreen is
-   * SIL Open Font License. Mojang's own typeface is not used anywhere.
+   * SIL Open Font License, bundled from @fontsource/silkscreen. Mojang's own
+   * typeface is not used anywhere.
    */
   --font-display: 'Silkscreen', var(--font-mono);
 

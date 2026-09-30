@@ -16,6 +16,7 @@
     "test": "echo \"no unit tests\" && exit 0"
   },
   "dependencies": {
+    "@fontsource/silkscreen": "^5.3.0",
     "@lucide/svelte": "^1.48.0",
     "@smto/mc-contracts": "workspace:*",
     "skinview3d": "^3.4.2"

@@ -273,6 +273,14 @@ are safe: nothing rejects what it does not recognise.
 including the launcher fields (`ip`, `game`, `additions`, `config`,
 `background`, `news`). Read what you need out of it and ignore the rest.
 
+One key in it is read by the website: **`webmap`**, the address of the server's
+web map, for example `"webmap": "https://map.smto.dev/i5/"`. A server that has
+one is listed on the Web Map page, and under Services in the menu while at least
+one server has a map; with none, the entry is not shown. Only an address that
+starts with `http://` or `https://` counts, so a typo or a `javascript:` address
+means no map rather than a broken or dangerous link. Set it in the admin area's
+extra fields.
+
 `GET /public/servers/{id}` returns one, or `404 server_not_found`. A server
 hidden from the public list answers exactly like one that does not exist.
 

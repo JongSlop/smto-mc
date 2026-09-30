@@ -7,6 +7,7 @@
   import Archive from '@lucide/svelte/icons/archive';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import Gamepad2 from '@lucide/svelte/icons/gamepad-2';
+  import MapIcon from '@lucide/svelte/icons/map';
   import Music from '@lucide/svelte/icons/music';
   import UserCog from '@lucide/svelte/icons/user-cog';
   import Video from '@lucide/svelte/icons/video';
@@ -15,6 +16,7 @@
   import ServerIcon from '$lib/components/ServerIcon.svelte';
   import { translate } from '$lib/i18n';
   import { LANGUAGE_NAMES, LANGUAGES } from '$lib/language';
+  import { webmapEntries } from '$lib/webmap';
   import type { LayoutData } from './$types';
 
   let { children, data }: { children: Snippet; data: LayoutData } = $props();
@@ -61,6 +63,7 @@
    * on them are still there, so they get a page of their own behind one entry.
    */
   const servers = $derived(data.servers);
+  const webmaps = $derived(webmapEntries(servers));
   const liveServers = $derived(servers.filter((server) => server.state !== 'ARCHIVED'));
   const hasArchived = $derived(servers.some((server) => server.state === 'ARCHIVED'));
   const archiveHref = $derived(resolve('/(app)/servers/archived'));
@@ -73,12 +76,22 @@
    * is switched on rather than opening onto nothing.
    */
   const services = $derived(data.services);
+  /**
+   * The Web Map entry is one of these too, though it is a page of our own rather
+   * than a hand-off: it exists only while at least one server has a map, so the
+   * menu never offers a page that would open onto an empty list.
+   */
+  const hasWebmap = $derived(webmaps.length > 0);
   /** Hidden outright when there is nothing in it rather than opening empty. */
   const hasServices = $derived(
-    services.launcher !== null || services.uploader.enabled || services.account !== null,
+    services.launcher !== null ||
+      services.uploader.enabled ||
+      services.account !== null ||
+      hasWebmap,
   );
   const onServicePage = $derived(page.url.pathname.startsWith(`${base}/services/`));
   const uploaderHref = $derived(resolve('/(app)/services/uploader'));
+  const webmapHref = $derived(resolve('/(app)/services/webmap'));
 
   /**
    * The switcher is a plain link carrying ?lang=, handled in hooks.server.ts,
@@ -158,6 +171,20 @@
                 <span>{t.services_launcher()}</span>
                 <span class="external"><ExternalLink size={14} aria-hidden="true" /></span>
                 <span class="visually-hidden">{t.services_external()}</span>
+              </a>
+            {/if}
+
+            <!--
+              A page of ours, not a hand-off, so a plain internal link with no
+              external marker. The page itself lists the maps and links out.
+            -->
+            {#if hasWebmap}
+              <a
+                href={resolve('/(app)/services/webmap')}
+                aria-current={page.url.pathname === webmapHref ? 'page' : undefined}
+              >
+                <MapIcon size={20} aria-hidden="true" />
+                <span>{t.services_webmap()}</span>
               </a>
             {/if}
 

@@ -73,6 +73,35 @@ const serverWritableSchema = z.object({
   isPublic: z.boolean().default(true),
 });
 
+/**
+ * The address of a server's web map, if it has one.
+ *
+ * Kept in `extra.webmap` rather than in a column of its own, which is what
+ * `extra` is for: a map is something only some servers have, and the launcher
+ * has no use for it. Read through this rather than off `extra` directly, for
+ * two reasons. `extra` is free-form, so the value can be anything an admin
+ * typed. And it ends up in an `href`, where a `javascript:` address would run
+ * in the visitor's browser when clicked, so only plain http and https pass.
+ * Anything else, an empty string included, means no map.
+ */
+export function serverWebmapUrl(extra: Record<string, unknown> | null | undefined): string | null {
+  const value = extra?.webmap;
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const address = value.trim();
+
+  // The literal start is the check that matters: a string that begins with
+  // `http://` or `https://` cannot be a `javascript:` or `data:` address, however
+  // a browser would go on to parse the rest of it. Written out rather than read
+  // off a parsed URL, because this package has no URL type to parse with, and
+  // zod's own http check refuses a bare IP address, which is how a map on
+  // Dynmap's default port is often reached.
+  return /^https?:\/\//i.test(address) && z.url().safeParse(address).success ? address : null;
+}
+
 export const createServerSchema = serverWritableSchema.extend({ id: serverIdSchema });
 export type CreateServerInput = z.infer<typeof createServerSchema>;
 

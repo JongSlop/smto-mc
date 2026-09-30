@@ -50,6 +50,19 @@ test.describe('anonymous', () => {
     await expect(page.getByText(/nothing has been archived/i)).toBeVisible();
   });
 
+  test('the web map page renders, and says so when no server has a map', async ({ page }) => {
+    // Public like the server pages. The seeded server sets no map, which is the
+    // case that has to say so rather than render an empty grid. The menu entry
+    // that points here is covered by hand: it needs a session.
+    await page.goto(`${APP}/services/webmap`);
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Web Map' })).toBeVisible();
+    await expect(
+      page.getByText(/none of our servers has a web map|keiner unserer server/i),
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: /open map|karte öffnen/i })).toHaveCount(0);
+  });
+
   test('an unknown server is a 404, not an empty page', async ({ page }) => {
     const response = await page.goto(`${APP}/servers/not-a-server`);
 

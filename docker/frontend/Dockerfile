@@ -6,17 +6,20 @@ WORKDIR /repo
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/schematics/package.json packages/schematics/package.json
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
 COPY e2e/package.json e2e/package.json
 RUN pnpm install --frozen-lockfile
 
 COPY packages/contracts packages/contracts
+COPY packages/schematics packages/schematics
 COPY frontend frontend
 
-# The frontend imports @smto/mc-contracts' compiled output, not its source, so
-# it has to be built first.
+# The frontend imports @smto/mc-contracts' and @smto/mc-schematics' compiled
+# output, not their source, so they have to be built first.
 RUN pnpm --filter @smto/mc-contracts build
+RUN pnpm --filter @smto/mc-schematics build
 RUN pnpm --filter @smto/mc-frontend build
 
 # Bundles the frontend with its production dependencies into one

@@ -5,6 +5,7 @@
   import { page } from '$app/state';
   import { ADMIN_ROLE } from '@smto/mc-contracts';
   import Archive from '@lucide/svelte/icons/archive';
+  import Blocks from '@lucide/svelte/icons/blocks';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import Gamepad2 from '@lucide/svelte/icons/gamepad-2';
   import MapIcon from '@lucide/svelte/icons/map';
@@ -82,16 +83,16 @@
    * menu never offers a page that would open onto an empty list.
    */
   const hasWebmap = $derived(webmaps.length > 0);
-  /** Hidden outright when there is nothing in it rather than opening empty. */
-  const hasServices = $derived(
-    services.launcher !== null ||
-      services.uploader.enabled ||
-      services.account !== null ||
-      hasWebmap,
-  );
+  /**
+   * Never empty any more, because the schematic converter needs nothing from
+   * anywhere else: it is a page of ours that runs in the browser. The menu is
+   * therefore always there for somebody signed in, and it is the other entries
+   * that come and go.
+   */
   const onServicePage = $derived(page.url.pathname.startsWith(`${base}/services/`));
   const uploaderHref = $derived(resolve('/(app)/services/uploader'));
   const webmapHref = $derived(resolve('/(app)/services/webmap'));
+  const schematicsHref = $derived(resolve('/(app)/services/schematics'));
 
   /**
    * The switcher is a plain link carrying ?lang=, handled in hooks.server.ts,
@@ -158,37 +159,48 @@
           </NavDropdown>
         {/if}
 
-        {#if hasServices}
-          <NavDropdown label={t.nav_services()} current={onServicePage}>
-            <!--
+        <NavDropdown label={t.nav_services()} current={onServicePage}>
+          <!--
               The way onto the network in the first place, so it goes first.
               A plain link: it is a public download page with nothing behind it.
             -->
-            {#if services.launcher}
-              <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-              <a href={services.launcher.url}>
-                <Gamepad2 size={20} aria-hidden="true" />
-                <span>{t.services_launcher()}</span>
-                <span class="external"><ExternalLink size={14} aria-hidden="true" /></span>
-                <span class="visually-hidden">{t.services_external()}</span>
-              </a>
-            {/if}
+          {#if services.launcher}
+            <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+            <a href={services.launcher.url}>
+              <Gamepad2 size={20} aria-hidden="true" />
+              <span>{t.services_launcher()}</span>
+              <span class="external"><ExternalLink size={14} aria-hidden="true" /></span>
+              <span class="visually-hidden">{t.services_external()}</span>
+            </a>
+          {/if}
 
-            <!--
+          <!--
               A page of ours, not a hand-off, so a plain internal link with no
               external marker. The page itself lists the maps and links out.
             -->
-            {#if hasWebmap}
-              <a
-                href={resolve('/(app)/services/webmap')}
-                aria-current={page.url.pathname === webmapHref ? 'page' : undefined}
-              >
-                <MapIcon size={20} aria-hidden="true" />
-                <span>{t.services_webmap()}</span>
-              </a>
-            {/if}
+          {#if hasWebmap}
+            <a
+              href={resolve('/(app)/services/webmap')}
+              aria-current={page.url.pathname === webmapHref ? 'page' : undefined}
+            >
+              <MapIcon size={20} aria-hidden="true" />
+              <span>{t.services_webmap()}</span>
+            </a>
+          {/if}
 
-            <!--
+          <!--
+              Always here: it runs entirely in the browser and needs nothing from
+              the backend or from any other service to be switched on.
+            -->
+          <a
+            href={resolve('/(app)/services/schematics')}
+            aria-current={page.url.pathname === schematicsHref ? 'page' : undefined}
+          >
+            <Blocks size={20} aria-hidden="true" />
+            <span>{t.services_schematics()}</span>
+          </a>
+
+          <!--
               Forms rather than links, and not a style choice: opening the
               uploader mints a one time credential over there, and this app
               preloads links on hover. A link here would spend a session every
@@ -199,45 +211,44 @@
               pressed is the one whose name and value are sent. Without the
               parameter the uploader opens on videos.
             -->
-            {#if services.uploader.enabled}
-              <form method="POST" action={uploaderHref}>
-                <button type="submit" name="intent" value="audio">
-                  <Music size={20} aria-hidden="true" />
-                  <span>{t.services_audio()}</span>
-                  <span class="external"><ExternalLink size={14} aria-hidden="true" /></span>
-                  <span class="visually-hidden">{t.services_external()}</span>
-                </button>
+          {#if services.uploader.enabled}
+            <form method="POST" action={uploaderHref}>
+              <button type="submit" name="intent" value="audio">
+                <Music size={20} aria-hidden="true" />
+                <span>{t.services_audio()}</span>
+                <span class="external"><ExternalLink size={14} aria-hidden="true" /></span>
+                <span class="visually-hidden">{t.services_external()}</span>
+              </button>
 
-                <button type="submit" name="intent" value="video">
-                  <Video size={20} aria-hidden="true" />
-                  <span>{t.services_video()}</span>
-                  <span class="external"><ExternalLink size={14} aria-hidden="true" /></span>
-                  <span class="visually-hidden">{t.services_external()}</span>
-                </button>
-              </form>
-            {/if}
+              <button type="submit" name="intent" value="video">
+                <Video size={20} aria-hidden="true" />
+                <span>{t.services_video()}</span>
+                <span class="external"><ExternalLink size={14} aria-hidden="true" /></span>
+                <span class="visually-hidden">{t.services_external()}</span>
+              </button>
+            </form>
+          {/if}
 
-            <!--
+          <!--
               A plain link, unlike the two above: the account system is where
               this session came from, so the person is already signed in over
               there and there is nothing to mint.
             -->
-            {#if services.account}
-              <!--
+          {#if services.account}
+            <!--
                 An absolute URL to another service, so there is no route of
                 ours for resolve() to resolve. The rule cannot see that through
                 the variable.
               -->
-              <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-              <a href={services.account.url}>
-                <UserCog size={20} aria-hidden="true" />
-                <span>{t.services_account()}</span>
-                <span class="external"><ExternalLink size={14} aria-hidden="true" /></span>
-                <span class="visually-hidden">{t.services_external()}</span>
-              </a>
-            {/if}
-          </NavDropdown>
-        {/if}
+            <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+            <a href={services.account.url}>
+              <UserCog size={20} aria-hidden="true" />
+              <span>{t.services_account()}</span>
+              <span class="external"><ExternalLink size={14} aria-hidden="true" /></span>
+              <span class="visually-hidden">{t.services_external()}</span>
+            </a>
+          {/if}
+        </NavDropdown>
 
         {#each trailingLinks as link (link.href)}
           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->

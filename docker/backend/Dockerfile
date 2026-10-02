@@ -15,6 +15,9 @@ WORKDIR /repo
 # not on every source edit.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/contracts/package.json packages/contracts/package.json
+# Not used by the backend, but the lockfile covers every workspace package and a
+# frozen install refuses to run if one of them is missing.
+COPY packages/schematics/package.json packages/schematics/package.json
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
 COPY e2e/package.json e2e/package.json

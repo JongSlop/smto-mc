@@ -83,3 +83,11 @@ export function formatDateTime(iso: string | null, lang: Language): string {
 export function minutesUntil(iso: string): number {
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 60_000));
 }
+
+/** A byte count in KiB with one decimal, written the way the reader writes numbers. */
+export function formatKiB(bytes: number, lang: Language): string {
+  return (bytes / 1024).toLocaleString(lang === 'de' ? 'de-DE' : 'en-GB', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+}

@@ -138,6 +138,9 @@ importers:
       '@playwright/test':
         specifier: ^1.57.0
         version: 1.62.1
+      '@smto/mc-schematics':
+        specifier: workspace:*
+        version: link:../packages/schematics
       '@types/node':
         specifier: ^26.4.1
         version: 26.4.1
@@ -156,6 +159,9 @@ importers:
       '@smto/mc-contracts':
         specifier: workspace:*
         version: link:../packages/contracts
+      '@smto/mc-schematics':
+        specifier: workspace:*
+        version: link:../packages/schematics
       skinview3d:
         specifier: ^3.4.2
         version: 3.4.2
@@ -194,6 +200,25 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/schematics:
+    dependencies:
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
+    devDependencies:
+      '@types/node':
+        specifier: ^26.4.1
+        version: 26.4.1
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@26.4.1)(vite@8.2.2(@types/node@26.4.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13))
 
 packages:
 

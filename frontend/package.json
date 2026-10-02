@@ -19,6 +19,7 @@
     "@fontsource/silkscreen": "^5.3.0",
     "@lucide/svelte": "^1.48.0",
     "@smto/mc-contracts": "workspace:*",
+    "@smto/mc-schematics": "workspace:*",
     "skinview3d": "^3.4.2"
   },
   "devDependencies": {

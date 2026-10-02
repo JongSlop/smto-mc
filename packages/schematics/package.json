@@ -1,0 +1,39 @@
+{
+  "name": "@smto/mc-schematics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Converts Create schematics and structure files from Minecraft 1.21.11 (Create Fly) to 1.20.1 (Create Fabric 6.0.8)",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "default": "./dist/esm/index.js"
+    }
+  },
+  "main": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "bin": {
+    "schem-conv": "./dist/esm/cli.js"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "convert": "tsx src/cli.ts",
+    "gen:blocks": "node scripts/gen-blocks.mjs"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

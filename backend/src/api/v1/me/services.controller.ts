@@ -58,7 +58,7 @@ export class MeServicesController {
     const issuer = new URL(config.get('OIDC_ISSUER', { infer: true }));
     const segments = issuer.pathname.split('/').filter(Boolean);
 
-    // `https://smto.dev/account/oauth` -> `https://smto.dev/account/`. An
+    // `https://account.smto.dev/oauth` -> `https://account.smto.dev/`. An
     // issuer at the root of a host has nothing above it to link to.
     this.accountUrl =
       segments.length > 1 ? `${issuer.origin}/${segments.slice(0, -1).join('/')}/` : null;

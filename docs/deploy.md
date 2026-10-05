@@ -9,7 +9,7 @@ account system can share a host.
 
 ### 1. Register the OAuth client
 
-At `https://smto.dev/account/admin/oauth-clients`:
+At `https://account.smto.dev/admin/oauth-clients`:
 
 | Field        | Value                                                |
 | ------------ | ---------------------------------------------------- |
@@ -49,7 +49,7 @@ next sign-in does not ask for a password again.
 
 Two settings, and skipping either leaves a logout that does not log out.
 
-On the client row in `https://smto.dev/account/admin/oauth-clients`:
+On the client row in `https://account.smto.dev/admin/oauth-clients`:
 
 | Field                                | Value                                                     |
 | ------------------------------------ | --------------------------------------------------------- |
@@ -71,9 +71,9 @@ Two halves of it can be checked without signing in at all:
 
 ```bash
 # The provider accepts our post-logout URI, and only ours
-curl -sI "https://smto.dev/account/oauth/session/end?client_id=smto-mc-link\
+curl -sI "https://account.smto.dev/oauth/session/end?client_id=smto-mc-link\
 &post_logout_redirect_uri=https%3A%2F%2Fsmto.dev%2Fmc%2Flink%2F" | head -1   # 200
-curl -s "https://smto.dev/account/oauth/session/end?client_id=smto-mc-link\
+curl -s "https://account.smto.dev/oauth/session/end?client_id=smto-mc-link\
 &post_logout_redirect_uri=https%3A%2F%2Fevil.example%2F" | grep -o 'not registered'
 
 # Our endpoint exists and refuses nonsense

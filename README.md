@@ -7,7 +7,7 @@ The service is called Observer in everything a person sees. The repository,
 package and image identifiers are still `smto-account-mc-link` and `@smto/mc-*`,
 because those are wired into nginx, GHCR and the deploy.
 
-Served at `https://smto.dev/mc/link/`, alongside the account system at
+Served at `https://mc.smto.dev/`, alongside the account system at
 `/account/`, which it signs people in with.
 
 ## What it does
@@ -48,7 +48,7 @@ cp .env.example .env      # fill in the secrets, see docs/deploy.md
 docker compose up --build # postgres, backend:3011, frontend:3010
 ```
 
-Then open `http://localhost:3010/mc/link/`.
+Then open `http://localhost:3010/`.
 
 Signing in needs an OAuth client registered at the account system pointing at
 your local redirect URI. `docs/deploy.md` walks through it. Without one, the
@@ -87,14 +87,14 @@ them.
 
 ## For plugin authors
 
-`docs/api.md` is the contract, and Swagger at `/mc/link/api/docs` is the
+`docs/api.md` is the contract, and Swagger at `/api/docs` is the
 interactive version of it. The Minecraft plugin lives outside this repository;
 these routes do not change without that document changing first.
 
 The short version: issue one token per server in the admin area, then
 
 ```bash
-curl -X POST https://smto.dev/mc/link/api/v1/ingest/metrics \
+curl -X POST https://mc.smto.dev/api/v1/ingest/metrics \
   -H "X-Api-Key: smtomc_..." -H 'content-type: application/json' \
   -d '{"serverId":"i5","entries":[
         {"uuid":"069a79f4-...","metric":"playtime_seconds","value":7200},

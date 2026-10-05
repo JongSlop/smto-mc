@@ -36,7 +36,7 @@ second caller.
 ## Sessions
 
 The browser holds one cookie, `smto_mc_session`: HttpOnly, `SameSite=Lax`,
-`Secure` outside dev, and scoped to `path=/mc/link`.
+`Secure` outside dev, and scoped to `path=/`.
 
 **The path scope is not cosmetic.** Several services share `smto.dev`. The
 account system scopes its cookies to `/account` for exactly this reason and this

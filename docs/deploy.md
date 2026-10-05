@@ -18,8 +18,8 @@ At `https://account.smto.dev/admin/oauth-clients`:
 | PKCE         | required, S256 (the provider insists on this anyway) |
 | Grants       | `authorization_code`, `refresh_token`                |
 | Scopes       | `openid profile email roles offline_access`          |
-| Redirect URI | `https://mc.smto.dev/auth/callback`             |
-| Post-logout  | `https://mc.smto.dev/`                          |
+| Redirect URI | `https://mc.smto.dev/auth/callback`                  |
+| Post-logout  | `https://mc.smto.dev/`                               |
 | Skip consent | off                                                  |
 
 Redirect URIs are matched exactly, with no wildcards, so these strings and
@@ -51,11 +51,11 @@ Two settings, and skipping either leaves a logout that does not log out.
 
 On the client row in `https://account.smto.dev/admin/oauth-clients`:
 
-| Field                                | Value                                                     |
-| ------------------------------------ | --------------------------------------------------------- |
+| Field                                | Value                                                |
+| ------------------------------------ | ---------------------------------------------------- |
 | Post-logout redirect URI             | `https://mc.smto.dev/`                               |
 | Back-channel logout URI              | `https://mc.smto.dev/api/v1/auth/backchannel-logout` |
-| Back-channel logout session required | on                                                        |
+| Back-channel logout session required | on                                                   |
 
 In this service's `.env`:
 

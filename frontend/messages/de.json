@@ -266,6 +266,8 @@
   "admin_scope_statsWrite": "Statistiken senden",
   "admin_scope_linkRedeem": "Verbindungscodes einlösen",
   "admin_scope_linkRead": "Verbundene Spieler nachschlagen",
+  "admin_scope_settingsRead": "Spielereinstellungen lesen",
+  "admin_scope_settingsWrite": "Spielereinstellungen schreiben",
   "audit_action": "Aktion",
   "audit_actor": "Wer",
   "audit_target": "Ziel",

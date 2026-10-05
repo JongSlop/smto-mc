@@ -266,6 +266,8 @@
   "admin_scope_statsWrite": "Post statistics",
   "admin_scope_linkRedeem": "Redeem link codes",
   "admin_scope_linkRead": "Look up linked players",
+  "admin_scope_settingsRead": "Read player settings",
+  "admin_scope_settingsWrite": "Write player settings",
   "audit_action": "Action",
   "audit_actor": "Who",
   "audit_target": "Target",

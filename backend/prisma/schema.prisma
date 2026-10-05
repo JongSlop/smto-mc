@@ -287,6 +287,29 @@ model PlayerMetric {
   @@map("player_metrics")
 }
 
+/// A string the plugins keep for a player, shared by every server.
+///
+/// This is how a mod carries something across servers: a player sets a nickname
+/// on one, the mod writes it here, and the mod on another reads it back when
+/// they join. Unlike a metric it is not per server, and it is not a number, so
+/// it has a table of its own. The service attaches no meaning to a key or a
+/// value, which is what lets a new setting go live without a deploy here.
+///
+/// Keyed by `mcUuid` rather than by account, for the reason metrics are: it
+/// works for a player who has not linked, and it survives an unlink and a
+/// relink. It is never shown on the website.
+model PlayerSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  mcUuid    String   @map("mc_uuid") @db.Uuid
+  key       String
+  value     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([mcUuid, key])
+  @@map("player_settings")
+}
+
 /// A plugin's credential. 256 bits of randomness, stored as SHA-256 only.
 ///
 /// Hashed rather than encrypted, unlike the account system's OAuth client

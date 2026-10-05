@@ -50,11 +50,13 @@ X-Api-Key: smtomc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 Scopes:
 
-| Scope         | Allows                     |
-| ------------- | -------------------------- |
-| `stats:write` | `POST /ingest/metrics`     |
-| `link:redeem` | `POST /ingest/link/redeem` |
-| `link:read`   | `GET /ingest/link/{uuid}`  |
+| Scope            | Allows                                                |
+| ---------------- | ----------------------------------------------------- |
+| `stats:write`    | `POST /ingest/metrics`                                |
+| `link:redeem`    | `POST /ingest/link/redeem`                            |
+| `link:read`      | `GET /ingest/link/{uuid}`                             |
+| `settings:read`  | `GET /ingest/players/{uuid}/settings[/{key}]`         |
+| `settings:write` | `PUT`, `DELETE /ingest/players/{uuid}/settings/{key}` |
 
 Two different 401s come back, and the difference is worth reading:
 
@@ -77,7 +79,9 @@ rewrite another server's statistics. An unpinned token can write for any server
 and exists for tooling that genuinely spans the network.
 
 Rate limit: 120 requests per minute per address by default. Batch rather than
-sending one request per player and this is not a limit you will meet.
+sending one request per player and this is not a limit you will meet. The
+settings routes are the exception and allow 600, since reading them on every
+join is the intended use.
 
 ---
 
@@ -236,6 +240,82 @@ not need to validate before asking.
 
 Store the `accountId`, never the `username`. The account system parks released
 usernames for thirty days and then hands them on.
+
+---
+
+## Player settings
+
+Scopes `settings:read` and `settings:write`. Strings a plugin keeps for a player
+so that another server can read them back. The case this exists for: a player
+sets a nickname on server A, the mod writes it here, and the mod on server B
+finds it when they join and applies it there.
+
+```
+GET    /ingest/players/{uuid}/settings          every setting the player has
+GET    /ingest/players/{uuid}/settings/{key}    one
+PUT    /ingest/players/{uuid}/settings/{key}    create or replace
+DELETE /ingest/players/{uuid}/settings/{key}    remove
+```
+
+```http
+PUT /api/v1/ingest/players/069a79f4-44e9-4726-a5be-fca90e38aaf5/settings/nickname
+X-Api-Key: smtomc_...
+Content-Type: application/json
+
+{ "value": "Sir Notch" }
+```
+
+```json
+{ "key": "nickname", "value": "Sir Notch", "updatedAt": "2026-10-05T18:22:41.031Z" }
+```
+
+On join, one read gets everything, as a plain map to apply and ignore the rest of:
+
+```http
+GET /api/v1/ingest/players/069a79f4-44e9-4726-a5be-fca90e38aaf5/settings
+```
+
+```json
+{
+  "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+  "settings": { "nickname": "Sir Notch", "chat.color": "gold" }
+}
+```
+
+**Keys and values are strings and the service gives them no meaning.** A new
+setting needs no change here, the same as a new metric.
+
+- `key`: lowercase letters, digits, `_`, `-` and `.`, starting with a letter or
+  digit, up to 64 characters. It is lowercased for you, so `Nickname` and
+  `nickname` are one setting. Use dots to namespace: `chat.color`.
+- `value`: any string up to 1024 characters, stored exactly as sent. No
+  trimming, and the empty string is a value, not a deletion. Use `DELETE` to
+  remove one.
+- At most 100 settings per player. A write that would add a 101st is refused
+  with `422 settings_limit_reached`, while changing an existing one still works.
+- `uuid` is accepted dashed or undashed. Unlike `GET /ingest/link/{uuid}`, a
+  malformed one is a `400 validation_failed`, because a write that silently did
+  nothing would be worse than an error.
+
+Behaviour worth knowing:
+
+- **Last write wins.** There is no versioning or compare-and-set. `updatedAt` is
+  there for a plugin that wants to compare before overwriting.
+- **`PUT` and `DELETE` are idempotent**, so a retry is always safe. `DELETE`
+  answers `204` whether or not the key existed.
+- `GET .../{key}` answers `404 setting_not_found` for a key that is not set.
+  `GET .../settings` for a player with none is `200` with `"settings": {}`,
+  never a 404.
+- **Not scoped to a server.** A setting belongs to the player and is the same on
+  every server, which is the point. That means a token pinned to one server can
+  still read and write any player's settings: the pin limits statistics, not
+  these. Give a server that only applies settings a `settings:read` token and
+  nothing more.
+- Keyed by the Minecraft UUID, not the account, so it works for a player who
+  never linked and survives an unlink.
+- Never shown on the website and never part of the public player profile. Treat
+  the values as player-supplied text: they are whatever a player typed into a
+  mod, and whoever renders one is responsible for escaping it.
 
 ---
 

@@ -5,7 +5,13 @@ import { z } from 'zod';
  * server's config file can post statistics without also being able to read who
  * every UUID belongs to.
  */
-export const API_TOKEN_SCOPES = ['stats:write', 'link:redeem', 'link:read'] as const;
+export const API_TOKEN_SCOPES = [
+  'stats:write',
+  'link:redeem',
+  'link:read',
+  'settings:read',
+  'settings:write',
+] as const;
 export const apiTokenScopeSchema = z.enum(API_TOKEN_SCOPES);
 export type ApiTokenScope = z.infer<typeof apiTokenScopeSchema>;
 

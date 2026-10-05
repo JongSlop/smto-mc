@@ -43,6 +43,7 @@ export async function resetDatabase(prisma: PrismaService): Promise<void> {
     TRUNCATE TABLE
       "audit_log",
       "player_metrics",
+      "player_settings",
       "api_tokens",
       "link_codes",
       "minecraft_links",

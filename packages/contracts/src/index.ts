@@ -5,5 +5,6 @@ export * from './minecraft.js';
 export * from './profile.js';
 export * from './server.js';
 export * from './service.js';
+export * from './settings.js';
 export * from './stats.js';
 export * from './token.js';

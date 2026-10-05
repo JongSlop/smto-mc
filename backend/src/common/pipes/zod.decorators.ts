@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Query, type PipeTransform } from '@nestjs/common';
+import { BadRequestException, Body, Param, Query, type PipeTransform } from '@nestjs/common';
 import type { ZodType } from 'zod';
 
 /**
@@ -35,3 +35,10 @@ export const ZodBody = (schema: ZodType) => Body(new ZodValidationPipe(schema));
  * the schema is expected to coerce whatever should not be one.
  */
 export const ZodQuery = (schema: ZodType) => Query(new ZodValidationPipe(schema));
+
+/**
+ * The same for the route's path parameters, as one object. Validating them
+ * together rather than one `@Param('x')` at a time means the error names the
+ * parameter (`uuid`, `key`) and a path is normalised in one place.
+ */
+export const ZodParams = (schema: ZodType) => Param(new ZodValidationPipe(schema));

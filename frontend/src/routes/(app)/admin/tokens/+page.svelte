@@ -20,7 +20,9 @@
   function scopeLabel(scope: ApiTokenScope): string {
     if (scope === 'stats:write') return t.admin_scope_statsWrite();
     if (scope === 'link:redeem') return t.admin_scope_linkRedeem();
-    return t.admin_scope_linkRead();
+    if (scope === 'link:read') return t.admin_scope_linkRead();
+    if (scope === 'settings:read') return t.admin_scope_settingsRead();
+    return t.admin_scope_settingsWrite();
   }
 </script>
 

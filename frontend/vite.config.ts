@@ -6,6 +6,10 @@ import { defineConfig } from 'vite';
 // non-default ports only has to set it once.
 const backend = process.env.BACKEND_INTERNAL_URL ?? 'http://127.0.0.1:3011';
 
+// Must match paths.base in svelte.config.js: empty in production, /mc/link for
+// a path-mounted preview. Drives the dev proxy rule below.
+const base = process.env.BASE_PATH ?? '';
+
 export default defineConfig({
   plugins: [
     sveltekit(),
@@ -29,12 +33,13 @@ export default defineConfig({
     // docs/nginx-snippet.conf: the API prefix is stripped, because the backend
     // serves it from clean internal paths.
     //
-    // With this in place a local PUBLIC_ORIGIN of http://localhost:3010/mc/link
-    // drives a complete authorization flow without a proxy in front.
+    // With this in place a local PUBLIC_ORIGIN of http://localhost:3010
+    // drives a complete authorization flow without a proxy in front. With
+    // BASE_PATH=/mc/link the rule moves under that prefix too.
     proxy: {
-      '/mc/link/api': {
+      [`${base}/api`]: {
         target: backend,
-        rewrite: (path) => path.replace(/^\/mc\/link/, ''),
+        rewrite: (path) => path.replace(new RegExp(`^${base}`), ''),
       },
     },
   },

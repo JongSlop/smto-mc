@@ -12,7 +12,7 @@ process.env.NODE_ENV ??= 'test';
 process.env.THROTTLE_DISABLED = '1';
 
 process.env.DATABASE_URL ??= 'postgresql://smto:smto@127.0.0.1:5434/smto_mc_link_test';
-process.env.PUBLIC_ORIGIN ??= 'http://localhost:3010/mc/link';
+process.env.PUBLIC_ORIGIN ??= 'http://localhost:3010';
 process.env.OIDC_ISSUER ??= 'https://smto.dev/account/oauth';
 process.env.OIDC_CLIENT_ID ??= 'smto-mc-link-test';
 process.env.OIDC_CLIENT_SECRET ??= 'test-secret';

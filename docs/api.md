@@ -1,7 +1,7 @@
 # Observer API
 
-Base URL: `https://smto.dev/mc/link/api/v1`
-Interactive reference: `https://smto.dev/mc/link/api/docs`
+Base URL: `https://mc.smto.dev/api/v1`
+Interactive reference: `https://mc.smto.dev/api/docs`
 
 This document is the contract the Minecraft server plugins are written against.
 The plugin lives outside this repository. These routes do not change without
@@ -492,7 +492,7 @@ Everything below runs against a local stack, no Minecraft server involved.
 
 ```bash
 BASE=http://127.0.0.1:3011/api/v1
-TOKEN=smtomc_...   # issued at /mc/link/admin/tokens
+TOKEN=smtomc_...   # issued at /admin/tokens
 
 # The server list, no credentials
 curl -s "$BASE/public/servers" | jq '.[] | {id, state}'

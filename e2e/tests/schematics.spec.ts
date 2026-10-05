@@ -4,8 +4,12 @@ import { gunzipSync } from 'node:zlib';
 import { getList, getNumber, readNbt } from '@smto/mc-schematics';
 import { expect, test, type Page } from '@playwright/test';
 
-/** The subpath the app is mounted at, matching svelte.config.js and nginx. */
-const APP = '/mc/link';
+/**
+ * The mount point the app was built with, matching BASE_PATH in svelte.config.js.
+ * Empty in production (mc.smto.dev); set E2E_APP_BASE=/mc/link to exercise the
+ * old subpath build.
+ */
+const APP = process.env.E2E_APP_BASE ?? '';
 
 /**
  * Opens the converter and waits until it can take a file.

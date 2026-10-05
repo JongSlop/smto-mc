@@ -1,6 +1,6 @@
 We need a webservice that allows for linking a Minecraft profile to a smto.dev account.  
 The smto.dev account auth portion has been finished, and the project exists at `../smto-account/system`.  
-Also take a look at `https://smto.dev/account/oauth/.well-known/openid-configuration` for more information.  
+Also take a look at `https://account.smto.dev/oauth/.well-known/openid-configuration` for more information.  
 
 smto.dev is a Minecraft server network.  
 The purpose of this service is to collect statistics across servers, so users can view those.  

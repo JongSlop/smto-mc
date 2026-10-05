@@ -21,7 +21,7 @@ const envSchema = z.object({
    * read from `${OIDC_ISSUER}/.well-known/openid-configuration` at boot rather
    * than hardcoded, so a change on their side does not need a change here.
    */
-  OIDC_ISSUER: z.url().default('https://smto.dev/account/oauth'),
+  OIDC_ISSUER: z.url().default('https://account.smto.dev/oauth'),
   OIDC_CLIENT_ID: z.string().min(1),
   OIDC_CLIENT_SECRET: z.string().min(1),
 

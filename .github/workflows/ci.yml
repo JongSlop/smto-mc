@@ -15,7 +15,7 @@ env:
   # Everything here talks to the throwaway service container below, never to
   # anything real. The suites rewrite the database name themselves.
   DATABASE_URL: postgresql://smto:smto@localhost:5432/smto_mc_link
-  PUBLIC_ORIGIN: http://localhost:3010/mc/link
+  PUBLIC_ORIGIN: http://localhost:3010
   OIDC_CLIENT_ID: smto-mc-link-ci
   OIDC_CLIENT_SECRET: ci-secret
   # 32 zero bytes, base64. Nothing real is ever encrypted with it.
@@ -144,10 +144,10 @@ jobs:
           PORT=3011 node backend/dist/main.js &
           PORT=3010 ORIGIN=http://127.0.0.1:3010 BACKEND_INTERNAL_URL=http://127.0.0.1:3011 \
             node frontend/build/index.js &
-          npx --yes wait-on http://127.0.0.1:3011/health http://127.0.0.1:3010/mc/link/
+          npx --yes wait-on http://127.0.0.1:3011/health http://127.0.0.1:3010/
 
-      # E2E_BASE_URL is the origin only; the specs carry the /mc/link prefix
-      # themselves. See the comment in e2e/playwright.config.ts.
+      # E2E_BASE_URL is the origin only. The specs mount at APP (empty unless
+      # E2E_APP_BASE overrides it). See e2e/playwright.config.ts.
       - run: pnpm test:browser
         env:
           E2E_BASE_URL: http://127.0.0.1:3010

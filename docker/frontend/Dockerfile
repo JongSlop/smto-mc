@@ -4,6 +4,12 @@ FROM node:22-slim AS build
 RUN corepack enable
 WORKDIR /repo
 
+# Build-time mount point for the frontend (see frontend/svelte.config.js).
+# Empty by default — production serves the app from the root of mc.smto.dev.
+# Pass --build-arg BASE_PATH=/mc/link to build the old subpath variant.
+ARG BASE_PATH=
+ENV BASE_PATH=${BASE_PATH}
+
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/schematics/package.json packages/schematics/package.json

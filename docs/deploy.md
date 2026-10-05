@@ -9,7 +9,7 @@ account system can share a host.
 
 ### 1. Register the OAuth client
 
-At `https://smto.dev/account/admin/oauth-clients`:
+At `https://account.smto.dev/admin/oauth-clients`:
 
 | Field        | Value                                                |
 | ------------ | ---------------------------------------------------- |
@@ -18,8 +18,8 @@ At `https://smto.dev/account/admin/oauth-clients`:
 | PKCE         | required, S256 (the provider insists on this anyway) |
 | Grants       | `authorization_code`, `refresh_token`                |
 | Scopes       | `openid profile email roles offline_access`          |
-| Redirect URI | `https://smto.dev/mc/link/auth/callback`             |
-| Post-logout  | `https://smto.dev/mc/link/`                          |
+| Redirect URI | `https://mc.smto.dev/auth/callback`             |
+| Post-logout  | `https://mc.smto.dev/`                          |
 | Skip consent | off                                                  |
 
 Redirect URIs are matched exactly, with no wildcards, so these strings and
@@ -49,18 +49,18 @@ next sign-in does not ask for a password again.
 
 Two settings, and skipping either leaves a logout that does not log out.
 
-On the client row in `https://smto.dev/account/admin/oauth-clients`:
+On the client row in `https://account.smto.dev/admin/oauth-clients`:
 
 | Field                                | Value                                                     |
 | ------------------------------------ | --------------------------------------------------------- |
-| Post-logout redirect URI             | `https://smto.dev/mc/link/`                               |
-| Back-channel logout URI              | `https://smto.dev/mc/link/api/v1/auth/backchannel-logout` |
+| Post-logout redirect URI             | `https://mc.smto.dev/`                               |
+| Back-channel logout URI              | `https://mc.smto.dev/api/v1/auth/backchannel-logout` |
 | Back-channel logout session required | on                                                        |
 
 In this service's `.env`:
 
 ```
-OIDC_POST_LOGOUT_REDIRECT_URI=https://smto.dev/mc/link/
+OIDC_POST_LOGOUT_REDIRECT_URI=https://mc.smto.dev/
 ```
 
 The account system also needs `features.backchannelLogout` enabled on its
@@ -71,14 +71,14 @@ Two halves of it can be checked without signing in at all:
 
 ```bash
 # The provider accepts our post-logout URI, and only ours
-curl -sI "https://smto.dev/account/oauth/session/end?client_id=smto-mc-link\
+curl -sI "https://account.smto.dev/oauth/session/end?client_id=smto-mc-link\
 &post_logout_redirect_uri=https%3A%2F%2Fsmto.dev%2Fmc%2Flink%2F" | head -1   # 200
-curl -s "https://smto.dev/account/oauth/session/end?client_id=smto-mc-link\
+curl -s "https://account.smto.dev/oauth/session/end?client_id=smto-mc-link\
 &post_logout_redirect_uri=https%3A%2F%2Fevil.example%2F" | grep -o 'not registered'
 
 # Our endpoint exists and refuses nonsense
 curl -s -X POST -d 'logout_token=not-a-token' \
-  https://smto.dev/mc/link/api/v1/auth/backchannel-logout                    # 400
+  https://mc.smto.dev/api/v1/auth/backchannel-logout                    # 400
 ```
 
 The rest needs a person: sign in, sign out on the account pages, and reload the
@@ -95,7 +95,7 @@ In the Azure portal, on the **existing** registration
 `d28a75f9-769f-4bd1-aa82-9791e38c6f67`:
 
 - Add a **Web** platform with redirect URI
-  `https://smto.dev/mc/link/link/msa/callback`.
+  `https://mc.smto.dev/link/msa/callback`.
 - Leave the launcher's existing mobile/desktop loopback client alone. One
   registration holds both.
 - Create a client secret and put it in `MSA_CLIENT_SECRET`.
@@ -114,7 +114,7 @@ openssl rand -base64 32   # SESSION_ENC_KEY
 openssl rand -base64 32   # POSTGRES_PASSWORD
 ```
 
-`PUBLIC_ORIGIN=https://smto.dev/mc/link`, no trailing slash. Every redirect URI
+`PUBLIC_ORIGIN=https://mc.smto.dev`, no trailing slash. Every redirect URI
 is built from it.
 
 ### 4. Point at the uploader, if it is running
@@ -187,13 +187,13 @@ docker logs --tail 20 smto-mc-link-watchtower-1
 
 ```bash
 # The backend is up and can reach its database
-curl -s https://smto.dev/mc/link/api/v1/public/servers | jq '.[] | {id, state}'
+curl -s https://mc.smto.dev/api/v1/public/servers | jq '.[] | {id, state}'
 
 # The frontend is up and knows its base path
-curl -sI https://smto.dev/mc/link/ | head -1
+curl -sI https://mc.smto.dev/ | head -1
 
 # Swagger renders
-curl -sI https://smto.dev/mc/link/api/docs | head -1
+curl -sI https://mc.smto.dev/api/docs | head -1
 ```
 
 Then sign in through the website once. If the login round trips and lands on the
@@ -206,7 +206,7 @@ path are all correct, which is most of what can go wrong.
 Check `PUBLIC_ORIGIN` for a trailing slash.
 
 **Cookies from the account system arriving here, or the other way round.** They
-should not. Their cookies are scoped to `/account` and ours to `/mc/link`,
+should not. Their cookies are scoped to `/account` and ours to `/`,
 deliberately, because several services share `smto.dev`. If a cookie ever shows
 up on the wrong path, something set `path=/` and it needs fixing rather than
 working around.

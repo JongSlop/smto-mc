@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test';
 
-/** The subpath the app is mounted at, matching svelte.config.js and nginx. */
-const APP = '/mc/link';
+/**
+ * The mount point the app was built with, matching BASE_PATH in svelte.config.js.
+ * Empty in production (mc.smto.dev); set E2E_APP_BASE=/mc/link to exercise the
+ * old subpath build.
+ */
+const APP = process.env.E2E_APP_BASE ?? '';
 
 /**
  * What a visitor who is not signed in can see.
@@ -72,7 +76,7 @@ test.describe('anonymous', () => {
   test('the dashboard sends a signed out visitor back to the start', async ({ page }) => {
     await page.goto(`${APP}/dashboard`);
 
-    await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
+    await expect(page).toHaveURL(new RegExp(`${APP}/+$`));
   });
 
   test('a leaderboard tab is an address, not client state', async ({ page }) => {
@@ -80,7 +84,7 @@ test.describe('anonymous', () => {
     // carried through the load rather than being lost on the way.
     await page.goto(`${APP}/leaderboards?metric=blocks_mined`);
 
-    await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
+    await expect(page).toHaveURL(new RegExp(`${APP}/+$`));
   });
 
   test('a leaderboard server filter is an address too', async ({ page }) => {
@@ -88,7 +92,7 @@ test.describe('anonymous', () => {
     // the backend suite, which is where the ranking rules live.
     await page.goto(`${APP}/leaderboards?metric=deaths&server=i5`);
 
-    await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
+    await expect(page).toHaveURL(new RegExp(`${APP}/+$`));
   });
 
   test('the leaderboards need a session', async ({ page }) => {
@@ -96,7 +100,7 @@ test.describe('anonymous', () => {
     // credential rather than on the open web.
     await page.goto(`${APP}/leaderboards`);
 
-    await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
+    await expect(page).toHaveURL(new RegExp(`${APP}/+$`));
   });
 
   test('a player page needs a session, with or without a server filter', async ({ page }) => {
@@ -104,7 +108,7 @@ test.describe('anonymous', () => {
     // behind the same credential as the boards that link to it.
     await page.goto(`${APP}/players/069a79f4-44e9-4726-a5be-fca90e38aaf5?server=i5`);
 
-    await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
+    await expect(page).toHaveURL(new RegExp(`${APP}/+$`));
   });
 
   test('the admin area is closed', async ({ page }) => {
@@ -112,7 +116,7 @@ test.describe('anonymous', () => {
 
     // Signed out lands back on the landing page. There is no admin page here
     // either way; the backend refuses the calls regardless of what renders.
-    await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
+    await expect(page).toHaveURL(new RegExp(`${APP}/+$`));
   });
 
   test('the language switch applies on the click, not on the next reload', async ({ page }) => {

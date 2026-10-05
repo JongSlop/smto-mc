@@ -121,10 +121,10 @@ export class OidcClientService {
     // refresh_token in it, which surfaces here as `no_refresh_token` and looks
     // for all the world like a misconfigured client registration.
     //
-    // The cost is that the consent screen appears on every sign in rather than
-    // only the first. That is the price of a refresh token, and skipConsent on
-    // the client does not buy it back: the scope is already stripped by the
-    // time consent is considered.
+    // The cost is that a consent prompt is requested on every sign in rather
+    // than only the first. The account system may still choose not to show it:
+    // a client an admin marked first-party has its consent screen suppressed,
+    // so the only thing this guarantees is that offline_access is kept.
     url.searchParams.set('prompt', 'consent');
 
     return url.toString();

@@ -1,4 +1,4 @@
-import type { Account } from '@smto/mc-contracts';
+import { PREFERRED_LANGUAGE_SETTING, type Account } from '@smto/mc-contracts';
 import type { Handle, RequestEvent } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 
@@ -22,11 +22,37 @@ function pickLanguage(event: RequestEvent): Language {
 }
 
 /**
+ * Tells the backend which language this person reads the site in, so that
+ * messages a game server sends them can be translated to match, without a
+ * resource pack on their side.
+ *
+ * Best effort and never in the way of the switch itself. Somebody who is signed
+ * out has nobody to store it for, and somebody with no linked profile has no
+ * Minecraft UUID to store it under, which the backend answers with a 400. Both
+ * are ordinary, and a backend that is down must not stop the page changing
+ * language. The seed on the settings page picks up whatever this misses.
+ */
+async function rememberLanguage(event: RequestEvent, language: Language): Promise<void> {
+  if (!readSession(event.cookies)) {
+    return;
+  }
+
+  try {
+    await apiAuthed(event.cookies, `/api/v1/me/settings/${PREFERRED_LANGUAGE_SETTING}`, {
+      method: 'PUT',
+      body: { value: language },
+    });
+  } catch {
+    // See above: nothing here is worth failing a language switch over.
+  }
+}
+
+/**
  * `?lang=de` on any page switches the stored language and lands back on the
  * same page with the parameter gone, rather than needing a dedicated route.
  * That keeps the switcher working everywhere, including with JavaScript off.
  */
-function applyLanguageSwitch(event: RequestEvent): void {
+async function applyLanguageSwitch(event: RequestEvent): Promise<void> {
   const requested = event.url.searchParams.get('lang');
 
   if (!LANGUAGES.includes(requested as Language)) {
@@ -37,6 +63,8 @@ function applyLanguageSwitch(event: RequestEvent): void {
     path: COOKIE_PATH,
     maxAge: 60 * 60 * 24 * 365,
   });
+
+  await rememberLanguage(event, requested as Language);
 
   const next = new URL(event.url);
   next.searchParams.delete('lang');
@@ -58,7 +86,7 @@ async function loadAccount(event: RequestEvent): Promise<Account | null> {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
-  applyLanguageSwitch(event);
+  await applyLanguageSwitch(event);
 
   event.locals.lang = pickLanguage(event);
   event.locals.account = await loadAccount(event);

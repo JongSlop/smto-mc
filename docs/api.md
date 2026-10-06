@@ -313,9 +313,61 @@ Behaviour worth knowing:
   nothing more.
 - Keyed by the Minecraft UUID, not the account, so it works for a player who
   never linked and survives an unlink.
-- Never shown on the website and never part of the public player profile. Treat
-  the values as player-supplied text: they are whatever a player typed into a
-  mod, and whoever renders one is responsible for escaping it.
+- Never part of the public player profile or anybody else's page. The player
+  sees their own on the website's settings page (below). Treat the values as
+  player-supplied text: they are whatever a player typed into a mod or a form,
+  and whoever renders one is responsible for escaping it.
+
+### Keys the website knows
+
+The plugin API treats every key alike. These two are also written by the
+website, so they have a meaning plugins can rely on:
+
+| Key                  | Written by                  | Value                                              |
+| -------------------- | --------------------------- | -------------------------------------------------- |
+| `nickname`           | the website, and any plugin | Up to 32 characters, or not set                    |
+| `preferred_language` | the website, and any plugin | `en` or `de` when the website wrote it, or not set |
+
+- **`nickname`** is what a player wants to be called. A player can change it in
+  game or on the website and it is the same setting, last write wins. What the
+  website stores has been cleaned up: control characters and newlines become
+  spaces, bidirectional overrides are removed, and so is `§`, so a nickname set
+  there cannot carry Minecraft colour codes. **A value written through the
+  plugin API is stored exactly as sent**, so a plugin that displays one should
+  not assume it is clean, and should apply its own limits. Clearing it on the
+  website deletes the setting rather than storing an empty string.
+- **`preferred_language`** is the language the player reads the website in, so a
+  server can translate its own messages (errors, command feedback) without a
+  resource pack. The website updates it whenever the player switches language
+  with the site's switcher. It also **sets it once, if nothing is stored yet**,
+  the first time a player with a linked profile opens their settings page, so
+  that someone who never touched the switcher still has a value. It never
+  overwrites an existing one that way.
+
+  Do not assume the value is one of `en` or `de`. A plugin may write another
+  code, for instance from the game client's own language, and a player who has
+  never visited the website has none at all. Fall back to your default for
+  anything you have no translation for.
+
+### What the website can do with them
+
+Under `/me/settings`, with the player's browser session. Not reachable with an
+`X-Api-Key`, and both routes need a linked profile, since the link is how the UUID
+is found: without one they answer `400 account_not_linked`.
+
+```
+GET /me/settings         every setting stored for the linked profile
+PUT /me/settings/{key}   set one of the two keys above
+```
+
+Reading shows everything, whoever wrote it, which is what the collapsed list at
+the bottom of the settings page uses. **Writing is limited to `nickname` and
+`preferred_language`**; any other key is `403 setting_not_editable`, so a form on
+a web page cannot overwrite a key some plugin keeps its own state in. `PUT` takes
+`{ "value": "..." }` and answers `{ "key": "nickname", "value": "Sir Notch" }`,
+with `"value": null` when a blank nickname removed the setting. A value that is
+not valid for its key, a nickname over 32 characters or a language the website is
+not translated into, is `400 validation_failed`.
 
 ---
 

@@ -1,9 +1,13 @@
 <script lang="ts">
+  import { NICKNAME_MAX } from '@smto/mc-contracts';
+
   import Alert from '$lib/components/Alert.svelte';
   import Button from '$lib/components/Button.svelte';
   import Card from '$lib/components/Card.svelte';
+  import Field from '$lib/components/Field.svelte';
   import Form from '$lib/components/Form.svelte';
   import LinkCode from '$lib/components/LinkCode.svelte';
+  import StoredSettings from '$lib/components/StoredSettings.svelte';
   import { invalidateAll } from '$app/navigation';
   import { base } from '$app/paths';
   import { formatDate, minutesUntil } from '$lib/format';
@@ -15,6 +19,16 @@
   const t = $derived(translate(data.lang));
   const error = $derived((form && 'error' in form ? form.error : null) ?? data.error);
   const unlinked = $derived(form && 'unlinked' in form ? form.unlinked : false);
+  const nicknameSaved = $derived(form && 'nicknameSaved' in form ? form.nicknameSaved : false);
+  const nicknameRemoved = $derived(
+    form && 'nicknameRemoved' in form ? form.nicknameRemoved : false,
+  );
+
+  // After a rejected save the box gets back what was typed; otherwise it shows
+  // what is stored, which is also what a successful save reloads into it.
+  const nicknameValue = $derived(
+    (form && 'typedNickname' in form ? form.typedNickname : null) ?? data.nickname,
+  );
 
   // A code minted by this page's action wins over anything else, because it is
   // what the person just asked for.
@@ -139,6 +153,35 @@
       {/snippet}
     </Form>
   </Card>
+
+  <Card title={t.settings_nicknameHeading()} description={t.settings_nicknameBody()}>
+    {#if nicknameSaved}
+      <Alert variant="success">{t.settings_nicknameSaved()}</Alert>
+    {:else if nicknameRemoved}
+      <Alert variant="success">{t.settings_nicknameRemoved()}</Alert>
+    {/if}
+
+    <Form action="?/nickname">
+      {#snippet children(submitting: boolean)}
+        <Field
+          name="nickname"
+          label={t.settings_nicknameLabel()}
+          value={nicknameValue}
+          hint={t.settings_nicknameHint({ max: NICKNAME_MAX })}
+          maxlength={NICKNAME_MAX}
+          required={false}
+        />
+        <div>
+          <Button busy={submitting}>{t.settings_nicknameSave()}</Button>
+        </div>
+      {/snippet}
+    </Form>
+  </Card>
+
+  <!-- Last on the page, and closed: it is for the curious, not what the page is for. -->
+  {#if data.settings}
+    <StoredSettings settings={data.settings} />
+  {/if}
 {:else}
   <p class="intro">{t.link_intro()}</p>
 

@@ -102,6 +102,17 @@
   const otherLanguages = $derived(LANGUAGES.filter((code) => code !== page.data.lang));
 </script>
 
+<!--
+  The shared smto.dev profile panel, served by the account system so a change
+  there reaches this header without a deploy here. Only for a signed in visitor:
+  signed out it would be a second "Sign in" next to ours.
+-->
+<svelte:head>
+  {#if account}
+    <script src="https://account.smto.dev/embed/profile.js" defer></script>
+  {/if}
+</svelte:head>
+
 <a class="skip visually-hidden" href="#main">{t.nav_skipToContent()}</a>
 
 <div class="shell">
@@ -288,6 +299,9 @@
       {/each}
 
       {#if account}
+        <!-- Drawn by the script above. Nothing renders if the account system is unreachable. -->
+        <smto-profile current="observer" lang={page.data.lang ?? 'en'}></smto-profile>
+
         <form method="POST" action={resolve('/auth/logout')}>
           <button type="submit">{t.nav_signOut()}</button>
         </form>

@@ -300,7 +300,7 @@
 
       {#if account}
         <!-- Drawn by the script above. Nothing renders if the account system is unreachable. -->
-        <smto-profile current="observer" lang={page.data.lang ?? 'en'}></smto-profile>
+        <smto-profile current="smto-mc-link" lang={page.data.lang ?? 'en'}></smto-profile>
 
         <form method="POST" action={resolve('/auth/logout')}>
           <button type="submit">{t.nav_signOut()}</button>

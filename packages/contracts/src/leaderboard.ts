@@ -3,11 +3,11 @@ import { z } from 'zod';
 /**
  * How many players a board shows.
  *
- * Ten is the length people expect from a top list, and it is short enough that
- * nine boards fit on one page without it turning into a directory of everybody
- * who has ever joined.
+ * Fifty rather than ten: a top list long enough to be worth scrolling at the
+ * sizes these servers run at, while still short of a directory of everybody who
+ * has ever joined.
  */
-export const LEADERBOARD_SIZE = 10;
+export const LEADERBOARD_SIZE = 50;
 
 export const leaderboardEntrySchema = z.object({
   /** 1 based, and dense in the sense that ties are broken rather than shared. */

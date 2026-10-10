@@ -356,7 +356,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-4);
-    margin-right: auto;
   }
 
   /*
@@ -390,10 +389,16 @@
     text-underline-offset: 4px;
   }
 
+  /*
+   * Pushed to the right edge here rather than on `nav`, because the nav is not
+   * always rendered: signed out on the home page there are no links, and an
+   * auto margin that lives on an absent element pushes nothing.
+   */
   .meta {
     display: flex;
     align-items: center;
     gap: var(--space-4);
+    margin-left: auto;
   }
 
   .lang {

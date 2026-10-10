@@ -1,5 +1,6 @@
 import { Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import {
   ingestMetricsSchema,
   mcUuidSchema,
@@ -46,6 +47,9 @@ export class IngestController {
   @Post('metrics')
   @HttpCode(200)
   @Scopes('stats:write')
+  // TEMPORARY: raised well above the 120/min default for a one-off import of
+  // archived statistics. Restore the default once that import has run.
+  @Throttle({ default: { ttl: 60_000, limit: 10_000 } })
   @ApiOperation({ summary: 'Post a batch of statistics for one server' })
   metrics(
     @ZodBody(ingestMetricsSchema) body: IngestMetricsInput,
